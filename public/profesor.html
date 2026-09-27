@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistencia QR - Profesor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body class="bg-slate-900 min-h-screen text-slate-100 p-4 flex flex-col items-center">
+
+    <div class="w-full max-w-md bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700 text-center mb-6">
+        <h1 class="text-xl font-bold text-indigo-400 mb-1">Escáner de Asistencia</h1>
+        <p class="text-xs text-slate-400 mb-4">Apunta la cámara al código QR del alumno</p>
+
+        <div id="reader" class="overflow-hidden rounded-xl bg-slate-950 border border-slate-700 w-full min-h-[250px]"></div>
+        <div id="resultBox" class="mt-4 p-4 rounded-xl hidden text-sm font-semibold transition-all"></div>
+    </div>
+
+    <div class="w-full max-w-md bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
+        <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center gap-2">
+                <h2 class="text-md font-bold text-slate-200">📋 Lista de Presentes</h2>
+                <span id="totalBadge" class="bg-indigo-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">0</span>
+            </div>
+            <a href="/exportar-excel" download class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-2 rounded-lg transition shadow-md">
+                📊 Descargar CSV
+            </a>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-700 text-slate-300 uppercase">
+                    <tr>
+                        <th class="p-2.5 rounded-l-lg">CÓDIGO / MATRÍCULA</th>
+                        <th class="p-2.5 rounded-r-lg">FECHA Y HORA</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaAsistencias" class="divide-y divide-slate-700 text-slate-300">
+                    <tr>
+                        <td colspan="2" class="p-4 text-center text-slate-500">Cargando registros...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let isProcessing = false;
+
+        async function cargarAsistencias() {
+            const tbody = document.getElementById('tablaAsistencias');
+            try {
+                const res = await fetch('/asistencias');
+                if (!res.ok) throw new Error(`Estado ${res.status}`);
+
+                const data = await res.json();
+                const lista = data.asistencias || (Array.isArray(data) ? data : []);
+                const total = data.total !== undefined ? data.total : lista.length;
+
+                document.getElementById('totalBadge').innerText = total;
+
+                if (lista.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="2" class="p-4 text-center text-slate-500">Aún no hay asistencias registradas.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = lista.slice().reverse().map(a => {
+                    const codigo = a.codigoEstudiante || a.alumnoId || 'Sin Código';
+                    const fecha = a.fechaHora || a.fecha || 'Sin fecha';
+                    return `
+                        <tr class="hover:bg-slate-700/50">
+                            <td class="p-2.5 font-mono font-bold text-indigo-300">${codigo}</td>
+                            <td class="p-2.5 text-slate-400 text-[11px]">${fecha}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error("Error al cargar asistencias:", e);
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="2" class="p-4 text-center text-rose-400 font-semibold">⚠️ Error al cargar: ${e.message}</td></tr>`;
+                }
+            }
+        }
+
+        async function onScanSuccess(decodedText) {
+            if (isProcessing) return;
+            isProcessing = true;
+
+            const resultBox = document.getElementById('resultBox');
+            resultBox.className = "mt-4 p-4 rounded-xl text-sm font-semibold border bg-slate-700 text-slate-200 border-slate-500 block";
+            resultBox.innerHTML = "⏳ Validando token en el servidor...";
+
+            try {
+                const response = await fetch('/validar-qr', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: decodedText })
+                });
+
+                const data = await response.json();
+
+                if (data.valido) {
+                    resultBox.className = "mt-4 p-4 rounded-xl text-sm font-semibold border bg-emerald-900/60 text-emerald-300 border-emerald-500 block";
+                    resultBox.innerHTML = data.mensaje;
+                    cargarAsistencias();
+                } else {
+                    resultBox.className = "mt-4 p-4 rounded-xl text-sm font-semibold border bg-rose-900/60 text-rose-300 border-rose-500 block";
+                    resultBox.innerHTML = data.mensaje;
+                }
+            } catch (error) {
+                resultBox.className = "mt-4 p-4 rounded-xl text-sm font-semibold border bg-amber-900/60 text-amber-300 border-amber-500 block";
+                resultBox.innerHTML = "❌ Error de conexión con el servidor.";
+            }
+
+            setTimeout(() => { isProcessing = false; }, 3000);
+        }
+
+        const html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 220, height: 220 } },
+            onScanSuccess
+        ).catch(err => console.error("Error al iniciar cámara:", err));
+
+        cargarAsistencias();
+    </script>
+</body>
+</html>
