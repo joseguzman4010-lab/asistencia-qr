@@ -13,6 +13,7 @@
     button:hover { opacity: 0.9; }
     .btn-exito { background-color: #28a745; }
     .btn-descargar { background-color: #17a2b8; }
+    .btn-salir { background-color: #dc3545; }
     #qrContainer { margin: 20px auto; padding: 15px; border: 1px solid #ddd; border-radius: 8px; display: inline-block; background: #fafafa; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
     th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
@@ -30,6 +31,7 @@
     <button onclick="generarToken()">Generar Nuevo QR / Token Único</button>
     <button class="btn-exito" onclick="cargarLista()">Actualizar Lista</button>
     <button class="btn-descargar" onclick="descargarCSV()">📥 Descargar Excel (CSV)</button>
+    <button class="btn-salir" onclick="cerrarSesion()">🔒 Salir</button>
   </div>
 
   <div id="qrContainer" style="display:none;">
@@ -53,22 +55,57 @@
   </table>
 
   <script>
-    async function generarToken() {
-      const res = await fetch('/api/generar-token');
-      const data = await res.json();
+    function obtenerPassword() {
+      let pass = sessionStorage.getItem('adminPass');
+      if (!pass) {
+        pass = prompt('Ingresa la contraseña de profesor:');
+        if (pass) {
+          sessionStorage.setItem('adminPass', pass);
+        }
+      }
+      return pass;
+    }
 
+    function manejarErrorAuth(res) {
+      if (res.status === 401) {
+        alert('Contraseña incorrecta.');
+        sessionStorage.removeItem('adminPass');
+        location.reload();
+        return true;
+      }
+      return false;
+    }
+
+    async function generarToken() {
+      const pass = obtenerPassword();
+      if (!pass) return;
+
+      const res = await fetch('/api/generar-token', {
+        headers: { 'x-admin-password': pass }
+      });
+
+      if (manejarErrorAuth(res)) return;
+
+      const data = await res.json();
       document.getElementById('tokenDisplay').innerText = data.token;
       document.getElementById('qrContainer').style.display = 'block';
 
       const urlAlumno = `${window.location.origin}/alumno.html?token=${data.token}`;
-
       QRCode.toCanvas(document.getElementById('qrCanvas'), urlAlumno, { width: 220 }, function (err) {
         if (err) console.error(err);
       });
     }
 
     async function cargarLista() {
-      const res = await fetch('/api/asistencias');
+      const pass = obtenerPassword();
+      if (!pass) return;
+
+      const res = await fetch('/api/asistencias', {
+        headers: { 'x-admin-password': pass }
+      });
+
+      if (manejarErrorAuth(res)) return;
+
       const datos = await res.json();
       const tbody = document.getElementById('tablaAsistencias');
       tbody.innerHTML = '';
@@ -86,9 +123,16 @@
       });
     }
 
-    // Función para exportar la lista a un archivo Excel (.csv)
     async function descargarCSV() {
-      const res = await fetch('/api/asistencias');
+      const pass = obtenerPassword();
+      if (!pass) return;
+
+      const res = await fetch('/api/asistencias', {
+        headers: { 'x-admin-password': pass }
+      });
+
+      if (manejarErrorAuth(res)) return;
+
       const datos = await res.json();
 
       if (!datos || datos.length === 0) {
@@ -96,7 +140,6 @@
         return;
       }
 
-      // \uFEFF añade compatibilidad con acentos y letras Ñ en Excel
       let csvContent = "\uFEFF";
       csvContent += "Folio,Primer Nombre,Primer Apellido,Código de Alumno,Fecha y Hora (CDMX)\n";
 
@@ -119,6 +162,12 @@
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+    }
+
+    function cerrarSesion() {
+      sessionStorage.removeItem('adminPass');
+      alert('Sesión cerrada.');
+      location.reload();
     }
 
     cargarLista();
