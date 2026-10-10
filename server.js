@@ -1,120 +1,74 @@
 const express = require('express');
-const cors = require('cors');
-const QRCode = require('qrcode');
-const fs = require('fs');
+const crypto = require('crypto');
 const path = require('path');
 
 const app = express();
 
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['*']
-}));
-
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
-const PORT = 3000;
-const ASISTENCIAS_FILE = path.join(__dirname, 'asistencias.json');
-const tokensQR = {};
+// Almacenamiento en memoria para tokens y asistencias
+const tokensRegistrados = new Map();
+const registroAsistencias = [];
 
-function obtenerAsistenciasGuardadas() {
-    if (!fs.existsSync(ASISTENCIAS_FILE)) return [];
-    try {
-        const content = fs.readFileSync(ASISTENCIAS_FILE, 'utf8');
-        return content ? JSON.parse(content) : [];
-    } catch (error) {
-        return [];
-    }
-}
+// 1. Generar Token Único Inmutable para el Profesor
+app.get('/api/generar-token', (req, res) => {
+  const tokenUnico = crypto.randomBytes(4).toString('hex').toUpperCase(); // Ej: "A8F3D1E9"
+  
+  tokensRegistrados.set(tokenUnico, {
+    estado: 'ACTIVO',
+    creadoEn: new Date()
+  });
 
-function guardarAsistencia(registro) {
-    const lista = obtenerAsistenciasGuardadas();
-    lista.push(registro);
-    fs.writeFileSync(ASISTENCIAS_FILE, JSON.stringify(lista, null, 2), 'utf8');
-}
-
-// 1. Generar QR
-app.get('/generar-qr/:codigoEstudiante', async (req, res) => {
-    try {
-        const { codigoEstudiante } = req.params;
-        const tokenUnico = `TOKEN_${codigoEstudiante}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-
-        tokensQR[tokenUnico] = {
-            codigoEstudiante: codigoEstudiante,
-            creadoEn: new Date(),
-            usado: false
-        };
-
-        const qrImageBase64 = await QRCode.toDataURL(tokenUnico);
-
-        res.json({
-            success: true,
-            codigoEstudiante: codigoEstudiante,
-            token: tokenUnico,
-            qrCode: qrImageBase64
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, error: 'Error al generar QR' });
-    }
+  res.json({ token: tokenUnico });
 });
 
-// 2. Validar QR
-app.post('/validar-qr', (req, res) => {
-    const { token } = req.body;
+// 2. Registrar Asistencia del Alumno
+app.post('/api/registrar-asistencia', (req, res) => {
+  const { primerNombre, primerApellido, codigoAlumno, token } = req.body;
 
-    if (!tokensQR[token]) {
-        return res.status(400).json({ 
-            valido: false, 
-            mensaje: '❌ Código QR inexistente o alterado.' 
-        });
-    }
+  if (!primerNombre || !primerApellido || !codigoAlumno || !token) {
+    return res.status(400).json({ error: 'Todos los campos son obligatorios.' });
+  }
 
-    if (tokensQR[token].usado) {
-        return res.status(400).json({ 
-            valido: false, 
-            mensaje: '⚠️ ¡ALERTA! Este código QR ya fue escaneado previamente.' 
-        });
-    }
+  // Verificar existencia del token
+  if (!tokensRegistrados.has(token)) {
+    return res.status(400).json({ error: 'El token proporcionado no es válido o no existe.' });
+  }
 
-    tokensQR[token].usado = true;
+  const datosToken = tokensRegistrados.get(token);
 
-    const registroAsistencia = {
-        codigoEstudiante: tokensQR[token].codigoEstudiante,
-        fechaHora: new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })
-    };
+  // Verificar si ya fue consumido
+  if (datosToken.estado !== 'ACTIVO') {
+    return res.status(403).json({ error: 'Este token ya fue utilizado y se encuentra bloqueado/sellado.' });
+  }
 
-    guardarAsistencia(registroAsistencia);
+  // Bloquear e inmutabilizar el token
+  datosToken.estado = 'CONSUMIDO';
+  tokensRegistrados.set(token, datosToken);
 
-    res.json({
-        valido: true,
-        mensaje: `✅ Asistencia registrada: ${registroAsistencia.codigoEstudiante}`,
-        registro: registroAsistencia
-    });
+  // Guardar el registro de asistencia
+  const comprobante = {
+    folio: `REG-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
+    primerNombre,
+    primerApellido,
+    codigoAlumno,
+    tokenOrigen: token,
+    fecha: new Date().toLocaleString()
+  };
+
+  registroAsistencias.push(comprobante);
+
+  res.json({
+    mensaje: '¡Asistencia registrada y sellada con éxito!',
+    comprobante
+  });
 });
 
-// 3. Obtener Lista de Asistencias (Ruta de la tabla)
-app.get('/asistencias', (req, res) => {
-    const lista = obtenerAsistenciasGuardadas();
-    res.json({ success: true, total: lista.length, asistencias: lista });
+// 3. Consultar Lista de Asistencias (para el Profesor)
+app.get('/api/asistencias', (req, res) => {
+  res.json(registroAsistencias);
 });
 
-// 4. Exportar CSV
-app.get('/exportar-excel', (req, res) => {
-    const lista = obtenerAsistenciasGuardadas();
-    let csvContent = "\uFEFFCodigo Estudiante,Fecha y Hora\n";
-
-    lista.forEach(a => {
-        const codigo = a.codigoEstudiante || a.alumnoId || 'Sin Código';
-        csvContent += `"${codigo}","${a.fechaHora || a.fecha || ''}"\n`;
-    });
-
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename=Reporte_Asistencias.csv');
-    res.status(200).send(csvContent);
-});
-
-app.listen(PORT, () => {
-    console.log(`Servidor activo en http://localhost:${PORT}`);
-});
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Servidor escuchando en el puerto ${PORT}`));
