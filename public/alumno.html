@@ -104,23 +104,23 @@
       <h1 class="titulo">Registro de Asistencia</h1>
     </div>
 
-    <form id="formAsistencia">
+    <!-- novalidate desactiva los globos feos por defecto del navegador para usar nuestras alertas -->
+    <form id="formAsistencia" novalidate>
       <div class="form-group">
         <label for="primerNombre">Primer Nombre:</label>
-        <input type="text" id="primerNombre" required pattern="[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+" title="Solo caracteres alfabéticos" placeholder="Ej. Juan">
+        <input type="text" id="primerNombre" placeholder="Ej. Juan">
       </div>
 
       <div class="form-group">
         <label for="primerApellido">Primer Apellido:</label>
-        <input type="text" id="primerApellido" required pattern="[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+" title="Solo caracteres alfabéticos" placeholder="Ej. Pérez">
+        <input type="text" id="primerApellido" placeholder="Ej. Pérez">
       </div>
 
       <div class="form-group">
         <label for="codigoAlumno">Código de Alumno (9 dígitos):</label>
-        <input type="text" id="codigoAlumno" required pattern="\d{9}" maxlength="9" minlength="9" title="Exactamente 9 números" placeholder="Ej. 219876543">
+        <input type="text" id="codigoAlumno" placeholder="Ej. 219876543">
       </div>
 
-      <!-- Token tomado de la URL -->
       <input type="hidden" id="token">
 
       <button type="submit">Registrar Asistencia</button>
@@ -136,20 +136,56 @@
       document.getElementById('token').value = tokenURL;
     }
 
+    // Expresiones regulares de validación
+    const regexSoloLetras = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
+    const regexSoloNumeros = /^\d+$/;
+
     document.getElementById('formAsistencia').addEventListener('submit', async (e) => {
       e.preventDefault();
 
+      const nombre = document.getElementById('primerNombre').value.trim();
+      const apellido = document.getElementById('primerApellido').value.trim();
+      const codigo = document.getElementById('codigoAlumno').value.trim();
       const tokenInput = document.getElementById('token').value || prompt('Ingresa el Token activo:');
 
+      // 1. Verificar campos vacíos
+      if (!nombre || !apellido || !codigo) {
+        alert('⚠️ ¡No te pases de listo! Llena todos los campos antes de enviar.');
+        return;
+      }
+
+      // 2. Validar que el nombre y apellido solo tengan letras
+      if (!regexSoloLetras.test(nombre) || !regexSoloLetras.test(apellido)) {
+        alert('⚠️ ¡Aguas! El nombre y apellido solo pueden llevar letras. Sin números ni símbolos raros.');
+        return;
+      }
+
+      // 3. Validar que el código contenga solo números
+      if (!regexSoloNumeros.test(codigo)) {
+        alert('⚠️ ¡Ey! El código de alumno debe ser exclusivamente de números.');
+        return;
+      }
+
+      // 4. Validar longitud exacta de 9 dígitos
+      if (codigo.length > 9) {
+        alert('⚠️ ¡No te pases de verga! Pusiste más de 9 dígitos. El código es de EXACTAMENTE 9 números.');
+        return;
+      }
+
+      if (codigo.length < 9) {
+        alert('⚠️ Te faltaron números. El código debe tener exactamente 9 dígitos.');
+        return;
+      }
+
       if (!tokenInput) {
-        alert('El token es obligatorio.');
+        alert('El token es obligatorio para registrar la asistencia.');
         return;
       }
 
       const payload = {
-        primerNombre: document.getElementById('primerNombre').value.trim(),
-        primerApellido: document.getElementById('primerApellido').value.trim(),
-        codigoAlumno: document.getElementById('codigoAlumno').value.trim(),
+        primerNombre: nombre,
+        primerApellido: apellido,
+        codigoAlumno: codigo,
         token: tokenInput
       };
 
