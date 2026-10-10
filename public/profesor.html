@@ -6,13 +6,16 @@
   <title>Profesor - 2026B Seguridad Acceso Redes Públicas</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 650px; margin: 0 auto; text-align: center; }
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 700px; margin: 0 auto; text-align: center; }
     .header { border-bottom: 2px solid #0056b3; padding-bottom: 10px; margin-bottom: 20px; }
     .materia { color: #0056b3; margin: 0; }
-    button { padding: 12px 20px; font-size: 1rem; background-color: #0056b3; color: white; border: none; border-radius: 6px; cursor: pointer; margin: 5px; }
+    button { padding: 12px 18px; font-size: 0.95rem; background-color: #0056b3; color: white; border: none; border-radius: 6px; cursor: pointer; margin: 5px; font-weight: bold; }
+    button:hover { opacity: 0.9; }
+    .btn-exito { background-color: #28a745; }
+    .btn-descargar { background-color: #17a2b8; }
     #qrContainer { margin: 20px auto; padding: 15px; border: 1px solid #ddd; border-radius: 8px; display: inline-block; background: #fafafa; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
     th { background-color: #f2f2f2; }
   </style>
 </head>
@@ -23,8 +26,11 @@
     <h3 style="margin-top: 5px; color: #444;">Panel del Profesor</h3>
   </div>
 
-  <button onclick="generarToken()">Generar Nuevo QR y Token Único</button>
-  <button onclick="cargarLista()" style="background-color: #28a745;">Actualizar Lista</button>
+  <div>
+    <button onclick="generarToken()">Generar Nuevo QR / Token Único</button>
+    <button class="btn-exito" onclick="cargarLista()">Actualizar Lista</button>
+    <button class="btn-descargar" onclick="descargarCSV()">📥 Descargar Excel (CSV)</button>
+  </div>
 
   <div id="qrContainer" style="display:none;">
     <h4>Token Activo: <span id="tokenDisplay" style="color: #d9534f;"></span></h4>
@@ -37,10 +43,10 @@
     <thead>
       <tr>
         <th>Folio</th>
-        <th>Nombre</th>
-        <th>Apellido</th>
+        <th>Primer Nombre</th>
+        <th>Primer Apellido</th>
         <th>Código</th>
-        <th>Fecha</th>
+        <th>Fecha y Hora (CDMX)</th>
       </tr>
     </thead>
     <tbody id="tablaAsistencias"></tbody>
@@ -54,7 +60,6 @@
       document.getElementById('tokenDisplay').innerText = data.token;
       document.getElementById('qrContainer').style.display = 'block';
 
-      // Enlace para el QR
       const urlAlumno = `${window.location.origin}/alumno.html?token=${data.token}`;
 
       QRCode.toCanvas(document.getElementById('qrCanvas'), urlAlumno, { width: 220 }, function (err) {
@@ -79,6 +84,41 @@
         `;
         tbody.appendChild(tr);
       });
+    }
+
+    // Función para exportar la lista a un archivo Excel (.csv)
+    async function descargarCSV() {
+      const res = await fetch('/api/asistencias');
+      const datos = await res.json();
+
+      if (!datos || datos.length === 0) {
+        alert('No hay asistencias registradas para descargar.');
+        return;
+      }
+
+      // \uFEFF añade compatibilidad con acentos y letras Ñ en Excel
+      let csvContent = "\uFEFF";
+      csvContent += "Folio,Primer Nombre,Primer Apellido,Código de Alumno,Fecha y Hora (CDMX)\n";
+
+      datos.forEach(row => {
+        const fila = [
+          `"${row.folio}"`,
+          `"${row.primerNombre}"`,
+          `"${row.primerApellido}"`,
+          `"${row.codigoAlumno}"`,
+          `"${row.fecha}"`
+        ].join(",");
+        csvContent += fila + "\n";
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Asistencias_2026B_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
 
     cargarLista();
