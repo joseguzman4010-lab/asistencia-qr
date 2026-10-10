@@ -107,20 +107,20 @@
     <form id="formAsistencia">
       <div class="form-group">
         <label for="primerNombre">Primer Nombre:</label>
-        <input type="text" id="primerNombre" required placeholder="Ej. Juan">
+        <input type="text" id="primerNombre" required pattern="[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+" title="Solo caracteres alfabéticos" placeholder="Ej. Juan">
       </div>
 
       <div class="form-group">
         <label for="primerApellido">Primer Apellido:</label>
-        <input type="text" id="primerApellido" required placeholder="Ej. Pérez">
+        <input type="text" id="primerApellido" required pattern="[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+" title="Solo caracteres alfabéticos" placeholder="Ej. Pérez">
       </div>
 
       <div class="form-group">
-        <label for="codigoAlumno">Código de Alumno:</label>
-        <input type="text" id="codigoAlumno" required placeholder="Ej. 219876543">
+        <label for="codigoAlumno">Código de Alumno (9 dígitos):</label>
+        <input type="text" id="codigoAlumno" required pattern="\d{9}" maxlength="9" minlength="9" title="Exactamente 9 números" placeholder="Ej. 219876543">
       </div>
 
-      <!-- Token tomado automáticamente del QR -->
+      <!-- Token tomado de la URL -->
       <input type="hidden" id="token">
 
       <button type="submit">Registrar Asistencia</button>
