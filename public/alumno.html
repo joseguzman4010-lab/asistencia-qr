@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Asistencia - 2026B Seguridad Acceso Redes Públicas</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -23,12 +24,12 @@
       padding: 25px;
       border-radius: 12px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      text-align: center;
     }
     .header {
-      text-align: center;
-      margin-bottom: 25px;
       border-bottom: 2px solid #0056b3;
       padding-bottom: 12px;
+      margin-bottom: 20px;
     }
     .materia {
       color: #0056b3;
@@ -44,6 +45,7 @@
     }
     .form-group {
       margin-bottom: 15px;
+      text-align: left;
     }
     label {
       display: block;
@@ -61,12 +63,9 @@
       box-sizing: border-box;
       outline: none;
     }
-    input:focus {
-      border-color: #0056b3;
-    }
     button {
       width: 100%;
-      background-color: #28a745;
+      background-color: #0056b3;
       color: white;
       border: none;
       padding: 14px;
@@ -76,23 +75,19 @@
       cursor: pointer;
       margin-top: 10px;
     }
-    #resultado {
+    #qrContainer {
       margin-top: 20px;
-      text-align: center;
+      display: none;
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 10px;
+      border: 2px dashed #0056b3;
     }
-    .exito {
-      background-color: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-      padding: 12px;
-      border-radius: 8px;
-    }
-    .error {
-      background-color: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-      padding: 12px;
-      border-radius: 8px;
+    #timerBar {
+      color: #d9534f;
+      font-weight: bold;
+      font-size: 0.95rem;
+      margin-top: 8px;
     }
   </style>
 </head>
@@ -101,10 +96,10 @@
   <div class="container">
     <div class="header">
       <p class="materia">2026B - Seguridad Acceso Redes Públicas</p>
-      <h1 class="titulo">Registro de Asistencia</h1>
+      <h1 class="titulo">Mi Pase de Asistencia</h1>
     </div>
 
-    <form id="formAsistencia" novalidate>
+    <form id="formAlumno" novalidate>
       <div class="form-group">
         <label for="primerNombre">Primer Nombre:</label>
         <input type="text" id="primerNombre" placeholder="Ej. Juan">
@@ -120,16 +115,17 @@
         <input type="text" id="codigoAlumno" placeholder="Ej. 219876543">
       </div>
 
-      <input type="hidden" id="token">
-
-      <button type="submit">Registrar Asistencia</button>
+      <button type="submit" id="btnActivar">Generar QR Dinámico</button>
     </form>
 
-    <div id="resultado"></div>
+    <div id="qrContainer">
+      <h3 style="margin: 0 0 10px 0; color: #333;">Muestra este QR al Profesor</h3>
+      <canvas id="qrCanvas"></canvas>
+      <div id="timerBar">Renovando en 5s...</div>
+    </div>
   </div>
 
   <script>
-    // Generar o recuperar Device UUID anónimo en el almacenamiento local
     function obtenerDeviceId() {
       let deviceId = localStorage.getItem('device_uuid');
       if (!deviceId) {
@@ -139,82 +135,67 @@
       return deviceId;
     }
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const tokenURL = urlParams.get('token');
-    if (tokenURL) {
-      document.getElementById('token').value = tokenURL;
-    }
-
     const regexSoloLetras = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
     const regexSoloNumeros = /^\d+$/;
 
-    document.getElementById('formAsistencia').addEventListener('submit', async (e) => {
+    let intervaloQR = null;
+    let contadorSegundos = 5;
+
+    document.getElementById('formAlumno').addEventListener('submit', (e) => {
       e.preventDefault();
 
       const nombre = document.getElementById('primerNombre').value.trim();
       const apellido = document.getElementById('primerApellido').value.trim();
       const codigo = document.getElementById('codigoAlumno').value.trim();
-      const tokenInput = document.getElementById('token').value || prompt('Ingresa el Token activo:');
 
       if (!nombre || !apellido || !codigo) {
-        alert('Por favor, completa todos los campos del formulario.');
+        alert('Por favor, completa todos los campos.');
         return;
       }
 
       if (!regexSoloLetras.test(nombre) || !regexSoloLetras.test(apellido)) {
-        alert('Nombre y apellido solo deben contener caracteres alfabéticos.');
+        alert('Nombre y apellido solo deben contener letras.');
         return;
       }
 
-      if (!regexSoloNumeros.test(codigo)) {
-        alert('El código de alumno debe componerse únicamente de dígitos numéricos.');
+      if (!regexSoloNumeros.test(codigo) || codigo.length !== 9) {
+        alert('El código debe tener exactamente 9 dígitos numéricos.');
         return;
       }
 
-      if (codigo.length !== 9) {
-        alert('El código de alumno debe constar exactamente de 9 dígitos.');
-        return;
-      }
+      // Mostrar el contenedor del QR
+      document.getElementById('qrContainer').style.display = 'block';
+      
+      // Iniciar generación continua del QR dinámico
+      actualizarQR(nombre, apellido, codigo);
+      
+      if (intervaloQR) clearInterval(intervaloQR);
 
-      if (!tokenInput) {
-        alert('El token activo es requerido para registrar la asistencia.');
-        return;
-      }
+      contadorSegundos = 5;
+      intervaloQR = setInterval(() => {
+        contadorSegundos--;
+        if (contadorSegundos <= 0) {
+          actualizarQR(nombre, apellido, codigo);
+          contadorSegundos = 5;
+        }
+        document.getElementById('timerBar').innerText = `Renovando en ${contadorSegundos}s...`;
+      }, 1000);
+    });
 
+    function actualizarQR(nombre, apellido, codigo) {
       const payload = {
         primerNombre: nombre,
         primerApellido: apellido,
         codigoAlumno: codigo,
-        token: tokenInput,
-        deviceId: obtenerDeviceId()
+        deviceId: obtenerDeviceId(),
+        timestamp: Date.now(),
+        nonce: Math.random().toString(36).substring(2, 10).toUpperCase()
       };
 
-      try {
-        const res = await fetch('/api/registrar-asistencia', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        const data = await res.json();
-        const divRes = document.getElementById('resultado');
-
-        if (res.ok) {
-          divRes.className = 'exito';
-          divRes.innerHTML = `
-            <p><strong>${data.mensaje}</strong></p>
-            <p style="margin:0;">Folio inmutable: <code>${data.comprobante.folio}</code></p>
-          `;
-          document.getElementById('formAsistencia').reset();
-        } else {
-          divRes.className = 'error';
-          divRes.innerHTML = `<p><strong>Error:</strong> ${data.error}</p>`;
-        }
-      } catch (err) {
-        document.getElementById('resultado').className = 'error';
-        document.getElementById('resultado').innerHTML = `<p>Error de conexión con el servidor.</p>`;
-      }
-    });
+      QRCode.toCanvas(document.getElementById('qrCanvas'), JSON.stringify(payload), { width: 220 }, function (err) {
+        if (err) console.error(err);
+      });
+    }
   </script>
 </body>
 </html>

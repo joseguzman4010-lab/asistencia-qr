@@ -10,8 +10,8 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Almacenamiento en memoria
-const tokensRegistrados = new Map();
 const registroAsistencias = [];
+const pasesConsumidos = new Set(); // Para evitar relectura del mismo QR dentro de sus 5s
 
 // Expresiones regulares de validación
 const regexCodigo = /^\d{9}$/;
@@ -27,24 +27,25 @@ const verificarProfesor = (req, res, next) => {
   }
 };
 
-// 1. Generar Token Único Inmutable (PROTEGIDO)
-app.get('/api/generar-token', verificarProfesor, (req, res) => {
-  const tokenUnico = crypto.randomBytes(4).toString('hex').toUpperCase();
-  
-  tokensRegistrados.set(tokenUnico, {
-    estado: 'ACTIVO',
-    creadoEn: new Date()
-  });
+// 1. Endpoint para que el Profesor Escanee el QR del Alumno (PROTEGIDO)
+app.post('/api/registrar-por-profesor', verificarProfesor, (req, res) => {
+  const { primerNombre, primerApellido, codigoAlumno, deviceId, timestamp, nonce } = req.body;
 
-  res.json({ token: tokenUnico });
-});
+  if (!primerNombre || !primerApellido || !codigoAlumno || !timestamp || !nonce) {
+    return res.status(400).json({ error: 'El código QR escaneado no contiene el formato válido.' });
+  }
 
-// 2. Registrar Asistencia con Detección de Multicuenta (PÚBLICO)
-app.post('/api/registrar-asistencia', (req, res) => {
-  const { primerNombre, primerApellido, codigoAlumno, token, deviceId } = req.body;
+  // 1. Validar ventana de tiempo del QR (Máximo 7 segundos para contemplar latencia de red)
+  const ahora = Date.now();
+  const diferenciaTiempo = ahora - parseInt(timestamp, 10);
 
-  if (!primerNombre || !primerApellido || !codigoAlumno || !token) {
-    return res.status(400).json({ error: 'Todos los campos son obligatorios.' });
+  if (isNaN(diferenciaTiempo) || diferenciaTiempo > 7000 || diferenciaTiempo < -2000) {
+    return res.status(400).json({ error: '⏱️ Pase expirado. El QR dura únicamente 5 segundos. Pídele al alumno que regenere su código.' });
+  }
+
+  // 2. Prevenir reutilización de un mismo pase generado
+  if (pasesConsumidos.has(nonce)) {
+    return res.status(400).json({ error: '⚠️ Este Pase QR ya fue escaneado y consumido previamente.' });
   }
 
   const nombreLimpio = primerNombre.trim();
@@ -60,25 +61,19 @@ app.post('/api/registrar-asistencia', (req, res) => {
     return res.status(400).json({ error: 'Nombre y apellido solo pueden contener letras.' });
   }
 
-  if (!tokensRegistrados.has(token)) {
-    return res.status(400).json({ error: 'El token proporcionado no es válido o no existe.' });
+  // 3. Verificar si el alumno ya registró asistencia en esta sesión
+  const yaRegistrado = registroAsistencias.find(r => r.codigoAlumno === codigoLimpio);
+  if (yaRegistrado) {
+    return res.status(400).json({ error: `El alumno con código ${codigoLimpio} ya tiene asistencia registrada.` });
   }
 
-  const datosToken = tokensRegistrados.get(token);
+  // Bloquear el pase utilizado
+  pasesConsumidos.add(nonce);
 
-  if (datosToken.estado !== 'ACTIVO') {
-    return res.status(403).json({ error: 'Este token ya fue utilizado y se encuentra sellado.' });
-  }
-
-  // Marcar token como consumido
-  datosToken.estado = 'CONSUMIDO';
-  tokensRegistrados.set(token, datosToken);
-
-  // DETECCIÓN DE FRAUDE: Verificar si el mismo dispositivo registró a otro alumno previamente
+  // 4. Detección de Multicuenta (Mismo celular usado para otro código)
   const registroDuplicado = registroAsistencias.find(
     r => r.deviceId === deviceIdLimpio && r.codigoAlumno !== codigoLimpio
   );
-
   const esSospechoso = Boolean(registroDuplicado);
 
   const fechaMexico = new Date().toLocaleString('es-MX', {
@@ -92,7 +87,6 @@ app.post('/api/registrar-asistencia', (req, res) => {
     primerNombre: nombreLimpio,
     primerApellido: apellidoLimpio,
     codigoAlumno: codigoLimpio,
-    tokenOrigen: token,
     deviceId: deviceIdLimpio,
     sospechoso: esSospechoso,
     fecha: fechaMexico
@@ -101,12 +95,12 @@ app.post('/api/registrar-asistencia', (req, res) => {
   registroAsistencias.push(comprobante);
 
   res.json({
-    mensaje: '¡Asistencia registrada y sellada con éxito!',
+    mensaje: `Asistencia registrada para ${nombreLimpio} ${apellidoLimpio}`,
     comprobante
   });
 });
 
-// 3. Consultar Lista de Asistencias (PROTEGIDO)
+// 2. Consultar Lista de Asistencias (PROTEGIDO)
 app.get('/api/asistencias', verificarProfesor, (req, res) => {
   res.json(registroAsistencias);
 });
