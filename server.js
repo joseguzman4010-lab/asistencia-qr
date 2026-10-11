@@ -39,9 +39,9 @@ app.get('/api/generar-token', verificarProfesor, (req, res) => {
   res.json({ token: tokenUnico });
 });
 
-// 2. Registrar Asistencia (PÚBLICO - Para alumnos)
+// 2. Registrar Asistencia con Detección de Multicuenta (PÚBLICO)
 app.post('/api/registrar-asistencia', (req, res) => {
-  const { primerNombre, primerApellido, codigoAlumno, token } = req.body;
+  const { primerNombre, primerApellido, codigoAlumno, token, deviceId } = req.body;
 
   if (!primerNombre || !primerApellido || !codigoAlumno || !token) {
     return res.status(400).json({ error: 'Todos los campos son obligatorios.' });
@@ -50,6 +50,7 @@ app.post('/api/registrar-asistencia', (req, res) => {
   const nombreLimpio = primerNombre.trim();
   const apellidoLimpio = primerApellido.trim();
   const codigoLimpio = codigoAlumno.trim();
+  const deviceIdLimpio = deviceId ? deviceId.trim() : 'DESCONOCIDO';
 
   if (!regexCodigo.test(codigoLimpio)) {
     return res.status(400).json({ error: 'El código debe ser exactamente de 9 dígitos numéricos.' });
@@ -69,8 +70,16 @@ app.post('/api/registrar-asistencia', (req, res) => {
     return res.status(403).json({ error: 'Este token ya fue utilizado y se encuentra sellado.' });
   }
 
+  // Marcar token como consumido
   datosToken.estado = 'CONSUMIDO';
   tokensRegistrados.set(token, datosToken);
+
+  // DETECCIÓN DE FRAUDE: Verificar si el mismo dispositivo registró a otro alumno previamente
+  const registroDuplicado = registroAsistencias.find(
+    r => r.deviceId === deviceIdLimpio && r.codigoAlumno !== codigoLimpio
+  );
+
+  const esSospechoso = Boolean(registroDuplicado);
 
   const fechaMexico = new Date().toLocaleString('es-MX', {
     timeZone: 'America/Mexico_City',
@@ -84,6 +93,8 @@ app.post('/api/registrar-asistencia', (req, res) => {
     primerApellido: apellidoLimpio,
     codigoAlumno: codigoLimpio,
     tokenOrigen: token,
+    deviceId: deviceIdLimpio,
+    sospechoso: esSospechoso,
     fecha: fechaMexico
   };
 

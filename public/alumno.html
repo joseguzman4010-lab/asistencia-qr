@@ -104,7 +104,6 @@
       <h1 class="titulo">Registro de Asistencia</h1>
     </div>
 
-    <!-- novalidate desactiva los globos feos por defecto del navegador para usar nuestras alertas -->
     <form id="formAsistencia" novalidate>
       <div class="form-group">
         <label for="primerNombre">Primer Nombre:</label>
@@ -130,13 +129,22 @@
   </div>
 
   <script>
+    // Generar o recuperar Device UUID anónimo en el almacenamiento local
+    function obtenerDeviceId() {
+      let deviceId = localStorage.getItem('device_uuid');
+      if (!deviceId) {
+        deviceId = 'DEV-' + Math.random().toString(36).substring(2, 9).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
+        localStorage.setItem('device_uuid', deviceId);
+      }
+      return deviceId;
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const tokenURL = urlParams.get('token');
     if (tokenURL) {
       document.getElementById('token').value = tokenURL;
     }
 
-    // Expresiones regulares de validación
     const regexSoloLetras = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
     const regexSoloNumeros = /^\d+$/;
 
@@ -148,37 +156,28 @@
       const codigo = document.getElementById('codigoAlumno').value.trim();
       const tokenInput = document.getElementById('token').value || prompt('Ingresa el Token activo:');
 
-      // 1. Verificar campos vacíos
       if (!nombre || !apellido || !codigo) {
-        alert('⚠️ ¡No te pases de listo! Llena todos los campos antes de enviar.');
+        alert('Por favor, completa todos los campos del formulario.');
         return;
       }
 
-      // 2. Validar que el nombre y apellido solo tengan letras
       if (!regexSoloLetras.test(nombre) || !regexSoloLetras.test(apellido)) {
-        alert('⚠️ ¡Aguas! El nombre y apellido solo pueden llevar letras. Sin números ni símbolos raros.');
+        alert('Nombre y apellido solo deben contener caracteres alfabéticos.');
         return;
       }
 
-      // 3. Validar que el código contenga solo números
       if (!regexSoloNumeros.test(codigo)) {
-        alert('⚠️ ¡Ey! El código de alumno debe ser exclusivamente de números.');
+        alert('El código de alumno debe componerse únicamente de dígitos numéricos.');
         return;
       }
 
-      // 4. Validar longitud exacta de 9 dígitos
-      if (codigo.length > 9) {
-        alert('⚠️ ¡No te pases de verga! Pusiste más de 9 dígitos. El código es de EXACTAMENTE 9 números.');
-        return;
-      }
-
-      if (codigo.length < 9) {
-        alert('⚠️ Te faltaron números. El código debe tener exactamente 9 dígitos.');
+      if (codigo.length !== 9) {
+        alert('El código de alumno debe constar exactamente de 9 dígitos.');
         return;
       }
 
       if (!tokenInput) {
-        alert('El token es obligatorio para registrar la asistencia.');
+        alert('El token activo es requerido para registrar la asistencia.');
         return;
       }
 
@@ -186,7 +185,8 @@
         primerNombre: nombre,
         primerApellido: apellido,
         codigoAlumno: codigo,
-        token: tokenInput
+        token: tokenInput,
+        deviceId: obtenerDeviceId()
       };
 
       try {

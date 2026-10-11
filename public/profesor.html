@@ -6,7 +6,7 @@
   <title>Profesor - 2026B Seguridad Acceso Redes Públicas</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 700px; margin: 0 auto; text-align: center; }
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 850px; margin: 0 auto; text-align: center; }
     .header { border-bottom: 2px solid #0056b3; padding-bottom: 10px; margin-bottom: 20px; }
     .materia { color: #0056b3; margin: 0; }
     button { padding: 12px 18px; font-size: 0.95rem; background-color: #0056b3; color: white; border: none; border-radius: 6px; cursor: pointer; margin: 5px; font-weight: bold; }
@@ -15,9 +15,11 @@
     .btn-descargar { background-color: #17a2b8; }
     .btn-salir { background-color: #dc3545; }
     #qrContainer { margin: 20px auto; padding: 15px; border: 1px solid #ddd; border-radius: 8px; display: inline-block; background: #fafafa; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.95rem; }
     th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
     th { background-color: #f2f2f2; }
+    .tag-valido { color: #155724; background-color: #d4edda; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; }
+    .tag-sospechoso { color: #721c24; background-color: #f8d7da; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; }
   </style>
 </head>
 <body>
@@ -45,10 +47,11 @@
     <thead>
       <tr>
         <th>Folio</th>
-        <th>Primer Nombre</th>
-        <th>Primer Apellido</th>
+        <th>Nombre</th>
+        <th>Apellido</th>
         <th>Código</th>
         <th>Fecha y Hora (CDMX)</th>
+        <th>Estado Dispositivo</th>
       </tr>
     </thead>
     <tbody id="tablaAsistencias"></tbody>
@@ -112,12 +115,17 @@
 
       datos.forEach(item => {
         const tr = document.createElement('tr');
+        const badgeEstado = item.sospechoso 
+          ? `<span class="tag-sospechoso">⚠️ Sospechoso (Mismo Celular)</span>`
+          : `<span class="tag-valido">✅ Válido</span>`;
+
         tr.innerHTML = `
           <td><code>${item.folio}</code></td>
           <td>${item.primerNombre}</td>
           <td>${item.primerApellido}</td>
           <td>${item.codigoAlumno}</td>
           <td>${item.fecha}</td>
+          <td>${badgeEstado}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -141,15 +149,18 @@
       }
 
       let csvContent = "\uFEFF";
-      csvContent += "Folio,Primer Nombre,Primer Apellido,Código de Alumno,Fecha y Hora (CDMX)\n";
+      csvContent += "Folio,Primer Nombre,Primer Apellido,Código de Alumno,Fecha y Hora (CDMX),Estado Dispositivo,Device ID\n";
 
       datos.forEach(row => {
+        const estadoTexto = row.sospechoso ? "SOSPECHOSO (MISMO CELULAR)" : "VALIDO";
         const fila = [
           `"${row.folio}"`,
           `"${row.primerNombre}"`,
           `"${row.primerApellido}"`,
           `"${row.codigoAlumno}"`,
-          `"${row.fecha}"`
+          `"${row.fecha}"`,
+          `"${estadoTexto}"`,
+          `"${row.deviceId}"`
         ].join(",");
         csvContent += fila + "\n";
       });
