@@ -361,8 +361,17 @@ app.delete('/api/asistencia/:folio', (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// SERVIDOR EN ESCUCHA
+// RUTAS DE NAVEGACIÓN Y SERVIDOR EN ESCUCHA
 // ------------------------------------------------------------------
+
+// Acceso directo al panel del profesor escribiendo /profesor
+app.get('/profesor', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'profesor.html'));
+});
+
+// Servir archivos estáticos (la raíz '/' cargará 'public/index.html' para los alumnos)
+app.use(express.static(path.join(__dirname, 'public')));
+
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n✅ Servidor CUSUR con Detección Anti-Trampas e Importador de PDF listo en puerto ${PORT}`);
+  console.log(`\n✅ Servidor CUSUR listo en puerto ${PORT}`);
 });
