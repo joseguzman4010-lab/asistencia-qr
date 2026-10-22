@@ -9,7 +9,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
     body { background-color: #f8fafc; color: #0f172a; padding: 20px; }
 
-    /* PANTALLA DE LOGIN / CONTRASEÑA */
+    /* PANTALLA DE LOGIN */
     #loginOverlay {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
@@ -97,33 +97,365 @@
 </head>
 <body>
 
-  <!-- PANTALLA DE ACCESO PROTEGIDO -->
+  <!-- PANTALLA DE LOGIN -->
   <div id="loginOverlay">
     <div class="login-card">
       🔒
       <h2>Acceso Docente</h2>
       <p>Ingresa la clave de acceso para ver el panel administrativo de CUSUR.</p>
-      <input type="password" id="passwordInput" placeholder="Contraseña de acceso" onkeypress="if(event.key==='Enter') validarPassword()">
-      <button onclick="validarPassword()">Ingresar al Panel</button>
+      <input type="password" id="passwordInput" placeholder="Contraseña de acceso" onkeypress="if(event.key==='Enter') window.validarPassword()">
+      <button id="btnIngresar" onclick="window.validarPassword()">Ingresar al Panel</button>
       <p id="errorMsg" class="error-msg">⚠️ Contraseña incorrecta</p>
     </div>
   </div>
 
-  <!-- CONTENIDO DEL PANEL PROFESOR -->
+  <!-- PANEL PRINCIPAL PROFESOR -->
   <div id="panelContenido">
     <div class="header">
-      <button class="btn-logout" onclick="cerrarSesion()">🔒 Salir</button>
+      <button class="btn-logout" onclick="window.cerrarSesion()">🔒 Salir</button>
       <h1>Control de Asistencias - CUSUR</h1>
       <h2 id="materiaTituloDisplay">Materia: Cargar Asignatura...</h2>
     </div>
 
     <div class="class-bar">
       <label for="selectClase">📚 Asignatura Activa:</label>
-      <select id="selectClase" class="class-select" onchange="cambiarMateria()"></select>
+      <select id="selectClase" class="class-select" onchange="window.cambiarMateria()"></select>
       
-      <button class="btn btn-purple" onclick="crearNuevaClase()">➕ Nueva Materia</button>
-      <button class="btn btn-orange" onclick="inscribirAlumno()">👤 Inscribir Manual</button>
+      <button class="btn btn-purple" onclick="window.crearNuevaClase()">➕ Nueva Materia</button>
+      <button class="btn btn-orange" onclick="window.inscribirAlumno()">👤 Inscribir Manual</button>
       
-      <!-- BOTONES DE IMPORTACIÓN -->
       <button class="btn btn-indigo" onclick="document.getElementById('inputPdf').click()">📄 Subir Lista SIIAU (PDF)</button>
-      <button class="
+      <button class="btn btn-teal" onclick="window.descargarPlantillaCSV()">📥 Plantilla CSV</button>
+      <button class="btn btn-blue" onclick="document.getElementById('inputCsv').click()">📤 Subir CSV</button>
+
+      <input type="file" id="inputPdf" accept=".pdf" style="display: none;" onchange="window.subirListaPDF(event)">
+      <input type="file" id="inputCsv" accept=".csv" style="display: none;" onchange="window.subirCSV(event)">
+    </div>
+
+    <div class="toolbar">
+      <button class="btn btn-green" onclick="window.iniciarProyector()">
+        <span>▶ Iniciar Proyector QR (Ventana Emergente)</span>
+      </button>
+      <button class="btn btn-red" onclick="window.cerrarListaFaltas()">🔒 Cerrar Lista y Generar Faltas</button>
+      <button class="btn btn-blue" onclick="window.cargarAsistencias()">🔄 Actualizar Lista</button>
+    </div>
+
+    <div class="main-grid">
+      <div class="card">
+        <h3>Proyector QR Independiente</h3>
+        <p style="font-size: 12px; color: #64748b; margin-top: 4px;">Modo transmisión segura para el salón de clase.</p>
+
+        <div style="margin-top: 15px;">
+          <label style="font-size: 12px; font-weight: 700;">URL / Dirección del Servidor:</label>
+          <input type="text" id="ipInput" class="ip-input" value="https://asistencia-cusur.onrender.com">
+        </div>
+
+        <div class="qr-container">
+          <p style="font-size: 13px; color: #475569; font-weight: 600; margin-bottom: 10px;">
+            🖥️ El código QR se abrirá en una ventana separada.
+          </p>
+          <button class="btn btn-green" onclick="window.iniciarProyector()">
+            ▶ Abrir Proyector QR
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Registro de Asistencias (<span id="totalCount">0</span>)</h3>
+        
+        <div style="overflow-x: auto; margin-top: 15px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Folio</th>
+                <th>Nombre</th>
+                <th>Apellido</th>
+                <th>Código</th>
+                <th>Fecha y Hora (CDMX)</th>
+                <th>Estado Dispositivo</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tablaCuerpo">
+              <tr><td colspan="8" style="text-align: center; color: #94a3b8;">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CLAVE_CORRECTA = "cusur2026";
+    let clases = [];
+    let asistencias = [];
+
+    const headersApi = {
+      'Content-Type': 'application/json'
+    };
+
+    // DEFINICIÓN GLOBAL DE FUNCIONES
+    window.validarPassword = function() {
+      const pass = document.getElementById('passwordInput').value.trim();
+      const errorElem = document.getElementById('errorMsg');
+      
+      if (pass === CLAVE_CORRECTA) {
+        if (errorElem) errorElem.style.display = 'none';
+        sessionStorage.setItem('profesor_autenticado', 'true');
+        window.desbloquearPanel();
+      } else {
+        if (errorElem) errorElem.style.display = 'block';
+      }
+    };
+
+    window.desbloquearPanel = async function() {
+      document.getElementById('loginOverlay').style.display = 'none';
+      document.getElementById('panelContenido').style.display = 'block';
+      await window.cargarClases();
+      window.cargarAsistencias();
+      setInterval(window.cargarAsistencias, 3000);
+    };
+
+    window.cerrarSesion = function() {
+      sessionStorage.removeItem('profesor_autenticado');
+      location.reload();
+    };
+
+    window.cargarClases = async function() {
+      try {
+        const res = await fetch('/api/clases', { headers: headersApi });
+        clases = await res.json();
+        const select = document.getElementById("selectClase");
+
+        select.innerHTML = clases.map(c => `
+          <option value="${c.id}">${c.nombre} (${c.clave})</option>
+        `).join('');
+
+        if (clases.length > 0) window.cambiarMateria();
+      } catch (err) {
+        console.error("Error cargando clases:", err);
+      }
+    };
+
+    window.cambiarMateria = function() {
+      const select = document.getElementById("selectClase");
+      const claseSel = clases.find(c => c.id === select.value);
+      if (claseSel) {
+        document.getElementById("materiaTituloDisplay").innerText = `Materia: ${claseSel.nombre}`;
+        window.cargarAsistencias();
+      }
+    };
+
+    window.iniciarProyector = function() {
+      const select = document.getElementById("selectClase");
+      const claseSel = clases.find(c => c.id === select.value);
+
+      const claseIdParam = claseSel ? claseSel.id : 'REDES-2026B';
+      const materiaParam = claseSel ? claseSel.nombre : 'General';
+
+      const ancho = 750;
+      const alto = 800;
+      const izquierda = (screen.width - ancho) / 2;
+      const arriba = (screen.height - alto) / 2;
+
+      const urlProyector = `/proyector.html?claseId=${encodeURIComponent(claseIdParam)}&materia=${encodeURIComponent(materiaParam)}`;
+
+      window.open(
+        urlProyector,
+        'ProyectorQR',
+        `width=${ancho},height=${alto},top=${arriba},left=${izquierda},resizable=yes,scrollbars=no,status=no`
+      );
+    };
+
+    window.crearNuevaClase = async function() {
+      const nombre = prompt("Nombre de la nueva materia:");
+      if (!nombre) return;
+      const clave = prompt("Clave o ciclo (ej. 2026B):", "2026B");
+
+      await fetch('/api/clases', {
+        method: 'POST',
+        headers: headersApi,
+        body: JSON.stringify({ nombre, clave })
+      });
+
+      await window.cargarClases();
+    };
+
+    window.inscribirAlumno = async function() {
+      const select = document.getElementById("selectClase");
+      const codigo = prompt("Código del alumno (9 dígitos):");
+      if (!codigo) return;
+      const nombre = prompt("Primer Nombre:");
+      if (!nombre) return;
+      const apellido = prompt("Primer Apellido:");
+
+      const res = await fetch('/api/alumnos', {
+        method: 'POST',
+        headers: headersApi,
+        body: JSON.stringify({ codigo, nombre, apellido, claseId: select.value })
+      });
+
+      const data = await res.json();
+      alert(data.message || "Alumno inscrito con éxito.");
+    };
+
+    window.subirListaPDF = async function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const select = document.getElementById("selectClase");
+      if (!select.value) {
+        alert("Por favor selecciona una materia activa antes de subir el PDF.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('pdfFile', file);
+      formData.append('claseId', select.value);
+
+      try {
+        const res = await fetch('/api/alumnos/importar-pdf', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        alert(data.message);
+        window.cargarAsistencias();
+      } catch (err) {
+        alert("Error al procesar el archivo PDF.");
+        console.error(err);
+      }
+      e.target.value = '';
+    };
+
+    window.descargarPlantillaCSV = function() {
+      window.open('/api/plantilla-alumnos', '_blank');
+    };
+
+    window.subirCSV = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const select = document.getElementById("selectClase");
+      if (!select.value) {
+        alert("Por favor selecciona una materia activa.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async function(evt) {
+        const texto = evt.target.result;
+        const lineas = texto.split(/\r\n|\n/);
+        const alumnos = [];
+
+        for (let i = 1; i < lineas.length; i++) {
+          const linea = lineas[i].trim();
+          if (!linea) continue;
+          const columnas = linea.split(',');
+          if (columnas.length >= 2) {
+            alumnos.push({
+              codigo: columnas[0].trim(),
+              nombre: columnas[1].trim(),
+              apellido: columnas[2] ? columnas[2].trim() : ''
+            });
+          }
+        }
+
+        if (alumnos.length === 0) {
+          alert("El archivo CSV no contiene registros válidos.");
+          return;
+        }
+
+        try {
+          const res = await fetch('/api/alumnos/importar', {
+            method: 'POST',
+            headers: headersApi,
+            body: JSON.stringify({ claseId: select.value, alumnos })
+          });
+          const data = await res.json();
+          alert(data.message);
+          window.cargarAsistencias();
+        } catch (err) {
+          alert("Error al importar el archivo CSV.");
+        }
+      };
+      reader.readAsText(file, 'UTF-8');
+      e.target.value = '';
+    };
+
+    window.cargarAsistencias = async function() {
+      const select = document.getElementById("selectClase");
+      if (!select || !select.value) return;
+
+      try {
+        const res = await fetch(`/api/asistencia?claseId=${select.value}`, { headers: headersApi });
+        asistencias = await res.json();
+        
+        document.getElementById("totalCount").innerText = asistencias.length;
+        const tbody = document.getElementById("tablaCuerpo");
+
+        if (asistencias.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #94a3b8;">Sin registros de asistencia aún.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = asistencias.map((a) => {
+          const devBadge = a.estadoDispositivo && a.estadoDispositivo.includes('Sospechoso') 
+            ? `<span class="badge-dev-sospechoso">${a.estadoDispositivo}</span>` 
+            : `<span class="badge-dev-valido">${a.estadoDispositivo || 'Válido'}</span>`;
+            
+          const estBadge = a.estado === 'PRESENTE' 
+            ? `<span class="badge-presente">PRESENTE</span>` 
+            : `<span class="badge-falta">FALTA</span>`;
+
+          return `
+            <tr>
+              <td><strong>${a.folio}</strong></td>
+              <td>${a.nombre || '-'}</td>
+              <td>${a.apellido || '-'}</td>
+              <td>${a.codigo}</td>
+              <td>${a.fechaHora}</td>
+              <td>${devBadge}</td>
+              <td>${estBadge}</td>
+              <td>
+                <button class="action-btn btn-delete" onclick="window.eliminarAsistencia('${a.folio}')">🗑️</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error("Error al cargar asistencias:", err);
+      }
+    };
+
+    window.eliminarAsistencia = async function(folio) {
+      if (!confirm(`¿Eliminar la asistencia con folio ${folio}?`)) return;
+      await fetch(`/api/asistencia/${folio}`, { method: 'DELETE', headers: headersApi });
+      window.cargarAsistencias();
+    };
+
+    window.cerrarListaFaltas = async function() {
+      const select = document.getElementById("selectClase");
+      if (!confirm("¿Cerrar lista y registrar faltas a los alumnos no reportados?")) return;
+      
+      const res = await fetch('/api/asistencia/cerrar-lista', {
+        method: 'POST',
+        headers: headersApi,
+        body: JSON.stringify({ claseId: select.value })
+      });
+      const data = await res.json();
+      alert(data.message || "Lista cerrada.");
+      window.cargarAsistencias();
+    };
+
+    // VERIFICAR AUTENTICACIÓN
+    window.onload = () => {
+      if (sessionStorage.getItem('profesor_autenticado') === 'true') {
+        window.desbloquearPanel();
+      }
+    };
+  </script>
+</body>
+</html>
