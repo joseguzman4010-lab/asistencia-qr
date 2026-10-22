@@ -1,0 +1,1 @@
+const { spawn } = require('child_process'); const child = spawn('C:\\Users\\joseg\\AppData\\Local\\npm-cache\\_npx\\094a17e86d981b10\\node_modules\\ngrok\\bin\\ngrok.exe', ['http', '3000', '--url=https://scraggly-rejoin-quake.ngrok-free.dev']); child.stdout.on('data', d => process.stdout.write(d)); child.stderr.on('data', d => process.stderr.write(d));

@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "app-alumno",
+    "slug": "app-alumno",
+    "version": "1.0.0",
+    "extra": {
+      "eas": {
+        "projectId": "27d9e000-f895-46d9-8e0f-3626245a205a"
+      }
+    },
+    "android": {
+      "package": "com.theagustin.asistenciaqr",
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "CAMERA"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permite el uso de la cámara para escanear el código QR de asistencia."
+        }
+      ]
+    ]
+  }
+}

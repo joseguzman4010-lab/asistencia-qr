@@ -3,199 +3,148 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Asistencia - 2026B Seguridad Acceso Redes Públicas</title>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+  <title>Asistencia Alumno - CUSUR</title>
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f0f2f5;
-      padding: 15px;
-      margin: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      box-sizing: border-box;
-    }
-    .container {
-      background: #ffffff;
-      width: 100%;
-      max-width: 420px;
-      padding: 25px;
-      border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-      text-align: center;
-    }
-    .header {
-      border-bottom: 2px solid #0056b3;
-      padding-bottom: 12px;
-      margin-bottom: 20px;
-    }
-    .materia {
-      color: #0056b3;
-      font-size: 0.9rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      margin: 0 0 6px 0;
-    }
-    .titulo {
-      color: #1c1e21;
-      font-size: 1.4rem;
-      margin: 0;
-    }
-    .form-group {
-      margin-bottom: 15px;
-      text-align: left;
-    }
-    label {
-      display: block;
-      font-weight: 600;
-      font-size: 0.9rem;
-      margin-bottom: 5px;
-      color: #4b4f56;
-    }
-    input {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #ccd0d5;
-      border-radius: 8px;
-      font-size: 1rem;
-      box-sizing: border-box;
-      outline: none;
-    }
-    button {
-      width: 100%;
-      background-color: #0056b3;
-      color: white;
-      border: none;
-      padding: 14px;
-      font-size: 1rem;
-      font-weight: bold;
-      border-radius: 8px;
-      cursor: pointer;
-      margin-top: 10px;
-    }
-    #qrContainer {
-      margin-top: 20px;
-      display: none;
-      background: #f8f9fa;
-      padding: 15px;
-      border-radius: 10px;
-      border: 2px dashed #0056b3;
-    }
-    #timerBar {
-      color: #d9534f;
-      font-weight: bold;
-      font-size: 0.95rem;
-      margin-top: 8px;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+    body { background-color: #0f172a; color: #f8fafc; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+    .card { background-color: #1e293b; border-radius: 16px; padding: 24px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; }
+    h1 { font-size: 22px; color: #38bdf8; text-align: center; margin-bottom: 6px; }
+    p.sub { font-size: 13px; color: #94a3b8; text-align: center; margin-bottom: 20px; }
+    .form-group { margin-bottom: 14px; }
+    label { font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 6px; }
+    input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #ffffff; font-size: 15px; }
+    input:focus { outline: none; border-color: #38bdf8; }
+    .btn { width: 100%; padding: 14px; background-color: #16a34a; border: none; border-radius: 8px; color: white; font-weight: 700; font-size: 16px; cursor: pointer; margin-top: 10px; transition: background 0.2s; }
+    .btn:disabled { background-color: #475569; cursor: not-allowed; }
+    .alert { padding: 12px; border-radius: 8px; font-size: 13px; margin-top: 15px; text-align: center; display: none; }
+    .alert-success { background-color: #14532d; color: #4ade80; border: 1px solid #16a34a; }
+    .alert-warning { background-color: #7f1d1d; color: #fca5a5; border: 1px solid #dc2626; }
+    .materia-badge { background: #334155; padding: 6px 12px; border-radius: 20px; text-align: center; font-size: 12px; color: #38bdf8; font-weight: 600; margin-bottom: 15px; }
   </style>
 </head>
 <body>
 
-  <div class="container">
-    <div class="header">
-      <p class="materia">2026B - Seguridad Acceso Redes Públicas</p>
-      <h1 class="titulo">Mi Pase de Asistencia</h1>
-    </div>
+  <div class="card">
+    <h1>Pase de Asistencia CUSUR</h1>
+    <p class="sub">Confirma tus datos para registrar asistencia</p>
 
-    <form id="formAlumno" novalidate>
+    <div id="materiaInfo" class="materia-badge">Cargando clase...</div>
+
+    <form id="asistenciaForm">
       <div class="form-group">
-        <label for="primerNombre">Primer Nombre:</label>
-        <input type="text" id="primerNombre" placeholder="Ej. Juan">
+        <label for="codigo">Código del Alumno (9 dígitos):</label>
+        <input type="number" id="codigo" placeholder="Ej. 222940104" required>
       </div>
 
       <div class="form-group">
-        <label for="primerApellido">Primer Apellido:</label>
-        <input type="text" id="primerApellido" placeholder="Ej. Pérez">
+        <label for="nombre">Primer Nombre:</label>
+        <input type="text" id="nombre" placeholder="Ej. Jose" required>
       </div>
 
       <div class="form-group">
-        <label for="codigoAlumno">Código de Alumno (9 dígitos):</label>
-        <input type="text" id="codigoAlumno" placeholder="Ej. 219876543">
+        <label for="apellido">Primer Apellido:</label>
+        <input type="text" id="apellido" placeholder="Ej. Avalos">
       </div>
 
-      <button type="submit" id="btnActivar">Generar QR Dinámico</button>
+      <button type="submit" id="btnEnviar" class="btn">✅ Confirmar Asistencia</button>
     </form>
 
-    <div id="qrContainer">
-      <h3 style="margin: 0 0 10px 0; color: #333;">Muestra este QR al Profesor</h3>
-      <canvas id="qrCanvas"></canvas>
-      <div id="timerBar">Renovando en 5s...</div>
-    </div>
+    <div id="alertBox" class="alert"></div>
   </div>
 
   <script>
     function obtenerDeviceId() {
-      let deviceId = localStorage.getItem('device_uuid');
-      if (!deviceId) {
-        deviceId = 'DEV-' + Math.random().toString(36).substring(2, 9).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
-        localStorage.setItem('device_uuid', deviceId);
+      let devId = localStorage.getItem('cusur_device_hardware_id');
+      if (!devId) {
+        devId = 'WEB-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+        localStorage.setItem('cusur_device_hardware_id', devId);
       }
-      return deviceId;
+      return devId;
     }
 
-    const regexSoloLetras = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
-    const regexSoloNumeros = /^\d+$/;
+    window.onload = () => {
+      const savedCodigo = localStorage.getItem('cusur_student_codigo');
+      const savedNombre = localStorage.getItem('cusur_student_nombre');
+      const savedApellido = localStorage.getItem('cusur_student_apellido');
 
-    let intervaloQR = null;
-    let contadorSegundos = 5;
+      if (savedCodigo) document.getElementById('codigo').value = savedCodigo;
+      if (savedNombre) document.getElementById('nombre').value = savedNombre;
+      if (savedApellido) document.getElementById('apellido').value = savedApellido;
 
-    document.getElementById('formAlumno').addEventListener('submit', (e) => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const materia = urlParams.get('materia') || 'Clase General';
+      document.getElementById('materiaInfo').innerText = `📚 ${materia}`;
+    };
+
+    document.getElementById('asistenciaForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const nombre = document.getElementById('primerNombre').value.trim();
-      const apellido = document.getElementById('primerApellido').value.trim();
-      const codigo = document.getElementById('codigoAlumno').value.trim();
+      const btn = document.getElementById('btnEnviar');
+      const alertBox = document.getElementById('alertBox');
+      const codigo = document.getElementById('codigo').value.trim();
+      const nombre = document.getElementById('nombre').value.trim();
+      const apellido = document.getElementById('apellido').value.trim();
 
-      if (!nombre || !apellido || !codigo) {
-        alert('Por favor, completa todos los campos.');
+      const urlParams = new URLSearchParams(window.location.search);
+      const claseId = urlParams.get('claseId') || 'REDES-2026B';
+      const materia = urlParams.get('materia') || 'General';
+      const sessionId = urlParams.get('sessionId') || 'CLASE-ACTIVA';
+
+      if (!codigo || !nombre) {
+        alert("El código y nombre son obligatorios.");
         return;
       }
 
-      if (!regexSoloLetras.test(nombre) || !regexSoloLetras.test(apellido)) {
-        alert('Nombre y apellido solo deben contener letras.');
-        return;
-      }
+      localStorage.setItem('cusur_student_codigo', codigo);
+      localStorage.setItem('cusur_student_nombre', nombre);
+      localStorage.setItem('cusur_student_apellido', apellido);
 
-      if (!regexSoloNumeros.test(codigo) || codigo.length !== 9) {
-        alert('El código debe tener exactamente 9 dígitos numéricos.');
-        return;
-      }
+      btn.disabled = true;
+      btn.innerText = "Registrando...";
+      alertBox.style.display = "none";
 
-      // Mostrar el contenedor del QR
-      document.getElementById('qrContainer').style.display = 'block';
-      
-      // Iniciar generación continua del QR dinámico
-      actualizarQR(nombre, apellido, codigo);
-      
-      if (intervaloQR) clearInterval(intervaloQR);
+      try {
+        const response = await fetch('/api/asistencia', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true' // <--- Bypass de pantalla de Ngrok
+          },
+          body: JSON.stringify({
+            claseId,
+            materia,
+            codigoAlumno: codigo,
+            primerNombre: nombre,
+            primerApellido: apellido,
+            deviceId: obtenerDeviceId(),
+            sessionId,
+            timestamp: Date.now()
+          })
+        });
 
-      contadorSegundos = 5;
-      intervaloQR = setInterval(() => {
-        contadorSegundos--;
-        if (contadorSegundos <= 0) {
-          actualizarQR(nombre, apellido, codigo);
-          contadorSegundos = 5;
+        const data = await response.json();
+        alertBox.style.display = "block";
+
+        if (response.ok && data.success) {
+          if (data.message.includes('Advertencia') || data.message.includes('Sospechoso')) {
+            alertBox.className = "alert alert-warning";
+          } else {
+            alertBox.className = "alert alert-success";
+          }
+          alertBox.innerText = data.message;
+        } else {
+          alertBox.className = "alert alert-warning";
+          alertBox.innerText = data.message || "No se pudo registrar la asistencia.";
         }
-        document.getElementById('timerBar').innerText = `Renovando en ${contadorSegundos}s...`;
-      }, 1000);
+      } catch (err) {
+        alertBox.style.display = "block";
+        alertBox.className = "alert alert-warning";
+        alertBox.innerText = "Error de conexión con el servidor.";
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "✅ Confirmar Asistencia";
+      }
     });
-
-    function actualizarQR(nombre, apellido, codigo) {
-      const payload = {
-        primerNombre: nombre,
-        primerApellido: apellido,
-        codigoAlumno: codigo,
-        deviceId: obtenerDeviceId(),
-        timestamp: Date.now(),
-        nonce: Math.random().toString(36).substring(2, 10).toUpperCase()
-      };
-
-      QRCode.toCanvas(document.getElementById('qrCanvas'), JSON.stringify(payload), { width: 220 }, function (err) {
-        if (err) console.error(err);
-      });
-    }
   </script>
 </body>
 </html>
