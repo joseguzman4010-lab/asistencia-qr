@@ -16,6 +16,14 @@ const DB_ALUMNOS = path.join(__dirname, 'alumnos.json');
 app.use(cors());
 app.use(express.json());
 app.use(fileUpload());
+
+// ------------------------------------------------------------------
+// REDIRECCIÓN DE LA RAÍZ (DEBE IR ANTES DE EXPRESS.STATIC)
+// ------------------------------------------------------------------
+app.get('/', (req, res) => {
+  res.redirect('/profesor.html');
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Helpers JSON
@@ -340,7 +348,7 @@ app.put('/api/asistencia/:folio', (req, res) => {
   res.json({ success: true, message: `Folio ${folioParam} actualizado a ${estado}.` });
 });
 
-// ELIMINAR REGISTRO (Corregido para números y texto)
+// ELIMINAR REGISTRO
 app.delete('/api/asistencia/:folio', (req, res) => {
   const folioParam = String(req.params.folio);
 
@@ -353,11 +361,8 @@ app.delete('/api/asistencia/:folio', (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// RUTAS DE NAVEGACIÓN Y SERVIDOR EN ESCUCHA
+// SERVIDOR EN ESCUCHA
 // ------------------------------------------------------------------
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'profesor.html')));
-app.get('/profesor', (req, res) => res.sendFile(path.join(__dirname, 'public', 'profesor.html')));
-
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n✅ Servidor CUSUR con Detección Anti-Trampas e Importador de PDF listo en puerto ${PORT}`);
 });
