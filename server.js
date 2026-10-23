@@ -12,19 +12,10 @@ const DB_ASISTENCIAS = path.join(__dirname, 'asistencias.json');
 const DB_CLASES = path.join(__dirname, 'clases.json');
 const DB_ALUMNOS = path.join(__dirname, 'alumnos.json');
 
-// Middleware
+// Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(fileUpload());
-
-// ------------------------------------------------------------------
-// REDIRECCIÓN DE LA RAÍZ (DEBE IR ANTES DE EXPRESS.STATIC)
-// ------------------------------------------------------------------
-app.get('/', (req, res) => {
-  res.redirect('/profesor.html');
-});
-
-app.use(express.static(path.join(__dirname, 'public')));
 
 // Helpers JSON
 function cargarJSON(filePath, defaultVal = []) {
@@ -53,6 +44,18 @@ let clasesRegistradas = cargarJSON(DB_CLASES, [
 let padronAlumnos = cargarJSON(DB_ALUMNOS, [
   { codigo: '222940104', nombre: 'Jose', apellido: 'Avalos', claseId: 'REDES-2026B' }
 ]);
+
+// ------------------------------------------------------------------
+// NAVEGACIÓN Y ARCHIVOS ESTÁTICOS
+// ------------------------------------------------------------------
+
+// Panel de profesor disponible en /profesor
+app.get('/profesor', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'profesor.html'));
+});
+
+// La raíz / sirve public/index.html para alumnos
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ------------------------------------------------------------------
 // RUTAS DE CLASES
@@ -137,7 +140,56 @@ app.post('/api/alumnos/importar', (req, res) => {
   res.json({ success: true, message: `¡Éxito! Se inscribieron ${agregados} alumnos a la materia.` });
 });
 
-// 3. IMPORTACIÓN DIRECTA DE PDF SIIAU (CUSUR)
+// 3. IMPORTACIÓN DIRECTA PEGAR TEXTO (SIIAU / PDF)
+app.post('/api/alumnos/importar-texto', (req, res) => {
+  const { claseId, texto } = req.body;
+  if (!claseId || !texto) {
+    return res.status(400).json({ success: false, message: 'Selecciona una clase y proporciona el texto.' });
+  }
+
+  const lineas = texto.split('\n');
+  const regexCodigo = /\b\d{9}\b/;
+  let agregados = 0;
+
+  lineas.forEach(linea => {
+    const match = linea.match(regexCodigo);
+    if (match) {
+      const codigo = match[0];
+
+      let textoLimpio = linea
+        .replace(codigo, '')
+        .replace(/\b(ITEL|INCO|INBI|ICIV|TELE|IG206|K01)\b/g, '')
+        .replace(/^\d+\s*\|\s*/, '')
+        .replace(/[^a-zA-ZÁÉÍÓÚÑáéíóúñ\s]/g, '')
+        .trim();
+
+      if (textoLimpio.length > 3) {
+        const partes = textoLimpio.split(/\s+/);
+        const apellidoStr = partes.slice(0, 2).join(' ');
+        const nombreStr = partes.slice(2).join(' ') || partes[partes.length - 1];
+
+        const existe = padronAlumnos.some(a => a.codigo === codigo && a.claseId === claseId);
+        if (!existe) {
+          padronAlumnos.push({
+            codigo: codigo,
+            nombre: nombreStr,
+            apellido: apellidoStr,
+            claseId: claseId
+          });
+          agregados++;
+        }
+      }
+    }
+  });
+
+  guardarJSON(DB_ALUMNOS, padronAlumnos);
+  res.json({
+    success: true,
+    message: `¡Procesado con éxito! Se registraron ${agregados} alumnos a la clase.`
+  });
+});
+
+// 4. IMPORTACIÓN DIRECTA DE PDF SIIAU (CUSUR)
 app.post('/api/alumnos/importar-pdf', async (req, res) => {
   try {
     if (!req.files || !req.files.pdfFile) {
@@ -193,7 +245,10 @@ app.post('/api/alumnos/importar-pdf', async (req, res) => {
 
   } catch (err) {
     console.error("Error al procesar el PDF:", err);
-    res.status(500).json({ success: false, message: 'Error interno al procesar el archivo PDF.' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error interno al procesar el PDF. Usa la opción "Pegar Lista SIIAU" o sube un archivo CSV.' 
+    });
   }
 });
 
@@ -361,17 +416,8 @@ app.delete('/api/asistencia/:folio', (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// RUTAS DE NAVEGACIÓN Y SERVIDOR EN ESCUCHA
+// SERVIDOR EN ESCUCHA
 // ------------------------------------------------------------------
-
-// Acceso directo al panel del profesor escribiendo /profesor
-app.get('/profesor', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'profesor.html'));
-});
-
-// Servir archivos estáticos (la raíz '/' cargará 'public/index.html' para los alumnos)
-app.use(express.static(path.join(__dirname, 'public')));
-
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n✅ Servidor CUSUR listo en puerto ${PORT}`);
 });
