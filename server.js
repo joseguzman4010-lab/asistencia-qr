@@ -263,6 +263,18 @@ app.get('/api/asistencia', (req, res) => {
   res.json(asistenciasProcesadas);
 });
 
+// VACIAR REGISTRO COMPLETO DE ASISTENCIAS DE UNA MATERIA
+app.delete('/api/asistencia/vaciar', (req, res) => {
+  const { claseId } = req.query;
+  if (claseId) {
+    asistenciasProcesadas = asistenciasProcesadas.filter(a => a.claseId !== claseId);
+  } else {
+    asistenciasProcesadas = [];
+  }
+  guardarJSON(DB_ASISTENCIAS, asistenciasProcesadas);
+  res.json({ success: true, message: 'Tabla de asistencias limpiada con éxito.' });
+});
+
 // EXPORTAR TABLA DE ASISTENCIAS A EXCEL (CSV)
 app.get('/api/asistencia/exportar', (req, res) => {
   const { claseId } = req.query;
