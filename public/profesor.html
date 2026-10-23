@@ -124,6 +124,7 @@
       <button class="btn btn-purple" onclick="window.crearNuevaClase()">➕ Nueva Materia</button>
       <button class="btn btn-orange" onclick="window.inscribirAlumno()">👤 Inscribir Manual</button>
       
+      <button class="btn btn-indigo" onclick="window.pegarListaTexto()">📋 Pegar Lista SIIAU</button>
       <button class="btn btn-indigo" onclick="document.getElementById('inputPdf').click()">📄 Subir Lista SIIAU (PDF)</button>
       <button class="btn btn-teal" onclick="window.descargarPlantillaCSV()">📥 Plantilla CSV</button>
       <button class="btn btn-blue" onclick="document.getElementById('inputCsv').click()">📤 Subir CSV</button>
@@ -298,6 +299,32 @@
 
       const data = await res.json();
       alert(data.message || "Alumno inscrito con éxito.");
+    };
+
+    window.pegarListaTexto = async function() {
+      const select = document.getElementById("selectClase");
+      if (!select || !select.value) {
+        alert("Por favor selecciona una materia activa.");
+        return;
+      }
+
+      const texto = prompt("Abre tu lista de SIIAU (PDF o web), selecciona todo el texto (Ctrl+A), cópialo (Ctrl+C) y pégalo aquí (Ctrl+V):");
+      if (!texto) return;
+
+      try {
+        const res = await fetch('/api/alumnos/importar-texto', {
+          method: 'POST',
+          headers: headersApi,
+          body: JSON.stringify({ claseId: select.value, texto })
+        });
+
+        const data = await res.json();
+        alert(data.message);
+        window.cargarAsistencias();
+      } catch (err) {
+        alert("Error al procesar el texto.");
+        console.error(err);
+      }
     };
 
     window.subirListaPDF = async function(e) {
