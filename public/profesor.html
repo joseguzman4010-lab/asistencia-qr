@@ -165,7 +165,7 @@
       </div>
 
       <div class="card">
-        <h3>Registro de Asistencias (<span id="totalCount">0</span>)</h3>
+        <h3>Alumnos Registrados / Asistencias (<span id="totalCount">0</span>)</h3>
         
         <div style="overflow-x: auto; margin-top: 15px;">
           <table>
@@ -193,7 +193,6 @@
   <script>
     const CLAVE_CORRECTA = "cusur2026";
     let clases = [];
-    let asistencias = [];
 
     const headersApi = { 'Content-Type': 'application/json' };
 
@@ -301,6 +300,7 @@
       });
       const data = await res.json();
       alert(data.message || "Alumno inscrito con éxito.");
+      window.cargarAsistencias();
     };
 
     window.abrirModalTexto = function() {
@@ -431,45 +431,76 @@
       e.target.value = '';
     };
 
+    // ------------------------------------------------------------------
+    // CARGAR ALUMNOS Y MOSTRAR "FALTA" POR DEFECTO HASTA QUE ESCANEEN
+    // ------------------------------------------------------------------
     window.cargarAsistencias = async function() {
       const select = document.getElementById("selectClase");
       if (!select || !select.value) return;
 
       try {
-        const res = await fetch(`/api/asistencia?claseId=${select.value}`, { headers: headersApi });
-        asistencias = await res.json();
-        
-        document.getElementById("totalCount").innerText = asistencias.length;
+        const [resAlumnos, resAsistencias] = await Promise.all([
+          fetch(`/api/alumnos?claseId=${select.value}`, { headers: headersApi }),
+          fetch(`/api/asistencia?claseId=${select.value}`, { headers: headersApi })
+        ]);
+
+        const alumnos = await resAlumnos.json();
+        const asistencias = await resAsistencias.json();
+
+        // Mapear asistencias escaneadas por código de alumno
+        const asistenciaMap = new Map();
+        asistencias.forEach(a => asistenciaMap.set(a.codigo, a));
+
+        document.getElementById("totalCount").innerText = alumnos.length;
         const tbody = document.getElementById("tablaCuerpo");
 
-        if (asistencias.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #94a3b8;">Sin registros de asistencia aún.</td></tr>`;
+        if (alumnos.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #94a3b8;">No hay alumnos en el padrón. Usa "📋 Pegar Lista SIIAU" para importar la clase.</td></tr>`;
           return;
         }
 
-        tbody.innerHTML = asistencias.map((a) => {
-          const devBadge = a.estadoDispositivo && a.estadoDispositivo.includes('Sospechoso') 
-            ? `<span class="badge-dev-sospechoso">${a.estadoDispositivo}</span>` 
-            : `<span class="badge-dev-valido">${a.estadoDispositivo || 'Válido'}</span>`;
-            
-          const estBadge = a.estado === 'PRESENTE' 
-            ? `<span class="badge-presente">PRESENTE</span>` 
-            : `<span class="badge-falta">FALTA</span>`;
+        tbody.innerHTML = alumnos.map((alumno) => {
+          const reg = asistenciaMap.get(alumno.codigo);
 
-          return `
-            <tr>
-              <td><strong>${a.folio}</strong></td>
-              <td>${a.nombre || '-'}</td>
-              <td>${a.apellido || '-'}</td>
-              <td>${a.codigo}</td>
-              <td>${a.fechaHora}</td>
-              <td>${devBadge}</td>
-              <td>${estBadge}</td>
-              <td>
-                <button class="action-btn btn-delete" onclick="window.eliminarAsistencia('${a.folio}')">🗑️</button>
-              </td>
-            </tr>
-          `;
+          if (reg) {
+            // El alumno ya escaneó o tiene registro manual
+            const devBadge = reg.estadoDispositivo && reg.estadoDispositivo.includes('Sospechoso') 
+              ? `<span class="badge-dev-sospechoso">${reg.estadoDispositivo}</span>` 
+              : `<span class="badge-dev-valido">${reg.estadoDispositivo || 'Válido'}</span>`;
+              
+            const estBadge = reg.estado === 'PRESENTE' 
+              ? `<span class="badge-presente">PRESENTE</span>` 
+              : `<span class="badge-falta">FALTA</span>`;
+
+            return `
+              <tr>
+                <td><strong>${reg.folio || '-'}</strong></td>
+                <td>${reg.nombre || alumno.nombre}</td>
+                <td>${reg.apellido || alumno.apellido || '-'}</td>
+                <td>${alumno.codigo}</td>
+                <td>${reg.fechaHora}</td>
+                <td>${devBadge}</td>
+                <td>${estBadge}</td>
+                <td>
+                  <button class="action-btn btn-delete" onclick="window.eliminarAsistencia('${reg.folio}')">🗑️</button>
+                </td>
+              </tr>
+            `;
+          } else {
+            // El alumno aún no ha escaneado: se muestra pendiente con FALTA por defecto
+            return `
+              <tr style="background-color: #fff1f2;">
+                <td><strong style="color: #94a3b8;">-</strong></td>
+                <td>${alumno.nombre}</td>
+                <td>${alumno.apellido || '-'}</td>
+                <td>${alumno.codigo}</td>
+                <td><span style="color: #94a3b8; font-size: 11px;">Esperando escaneo...</span></td>
+                <td><span style="color: #94a3b8; font-size: 11px;">Sin Registro</span></td>
+                <td><span class="badge-falta">FALTA</span></td>
+                <td>-</td>
+              </tr>
+            `;
+          }
         }).join('');
       } catch (err) {
         console.error("Error al cargar asistencias:", err);
