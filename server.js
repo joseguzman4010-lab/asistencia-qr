@@ -103,6 +103,18 @@ app.post('/api/alumnos', (req, res) => {
   res.json({ success: true, message: 'Alumno inscrito en el padrón.', alumno: nuevoAlumno });
 });
 
+// BORRAR PADRÓN DE ALUMNOS DE UNA MATERIA
+app.delete('/api/alumnos', (req, res) => {
+  const { claseId } = req.query;
+  if (claseId) {
+    padronAlumnos = padronAlumnos.filter(a => a.claseId !== claseId);
+  } else {
+    padronAlumnos = [];
+  }
+  guardarJSON(DB_ALUMNOS, padronAlumnos);
+  res.json({ success: true, message: 'Padrón de alumnos borrado con éxito.' });
+});
+
 // 1. DESCARGAR PLANTILLA CSV VACÍA (SOLO ENCABEZADOS)
 app.get('/api/plantilla-alumnos', (req, res) => {
   const contenidoCSV = 'codigo,nombre,apellido\n';
@@ -416,7 +428,7 @@ app.delete('/api/asistencia/:folio', (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// SERVIDOR EN ESCUCHA
+// SERVIDOR EN ESCUCHA (SIEMPRE AL FINAL DEL ARCHIVO)
 // ------------------------------------------------------------------
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n✅ Servidor CUSUR listo en puerto ${PORT}`);
