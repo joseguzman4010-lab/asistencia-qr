@@ -103,9 +103,9 @@ app.post('/api/alumnos', (req, res) => {
   res.json({ success: true, message: 'Alumno inscrito en el padrón.', alumno: nuevoAlumno });
 });
 
-// 1. DESCARGAR PLANTILLA CSV VACÍA
+// 1. DESCARGAR PLANTILLA CSV VACÍA (SOLO ENCABEZADOS)
 app.get('/api/plantilla-alumnos', (req, res) => {
-  const contenidoCSV = 'codigo,nombre,apellido\n222940104,Jose,Avalos\n220000000,Juan,Perez';
+  const contenidoCSV = 'codigo,nombre,apellido\n';
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename=Plantilla_Alumnos_CUSUR.csv');
   res.status(200).send('\uFEFF' + contenidoCSV);
