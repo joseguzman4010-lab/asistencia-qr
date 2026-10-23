@@ -14,7 +14,7 @@ const DB_ALUMNOS = path.join(__dirname, 'alumnos.json');
 
 // Middlewares
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(fileUpload());
 
 // Helpers JSON
@@ -46,15 +46,106 @@ let padronAlumnos = cargarJSON(DB_ALUMNOS, [
 ]);
 
 // ------------------------------------------------------------------
+// FUNCIÓN INTELIGENTE DE EXTRACCIÓN SIIAU (EN LÍNEA O POR BLOQUES)
+// ------------------------------------------------------------------
+function procesarTextoSIIAU(texto) {
+  const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
+  const regexCodigo9 = /\b\d{9}\b/;
+  const alumnosEncontrados = [];
+
+  // INTENTO 1: Formato en línea (Código y Nombre en la misma fila)
+  lineas.forEach(linea => {
+    const match = linea.match(regexCodigo9);
+    if (match) {
+      const codigo = match[0];
+      let textoLimpio = linea
+        .replace(codigo, '')
+        .replace(/\b(ITEL|INCO|INBI|ICIV|TELE|IG206|K01)\b/g, '')
+        .replace(/^\d+\s*\|\s*/, '')
+        .replace(/[^a-zA-ZÁÉÍÓÚÑáéíóúñ\s]/g, '')
+        .trim();
+
+      if (textoLimpio.length > 3) {
+        const partes = textoLimpio.split(/\s+/);
+        let apellidoStr = '', nombreStr = '';
+        if (partes.length === 2) {
+          apellidoStr = partes[0];
+          nombreStr = partes[1];
+        } else {
+          apellidoStr = partes.slice(0, 2).join(' ');
+          nombreStr = partes.slice(2).join(' ') || partes[partes.length - 1];
+        }
+        alumnosEncontrados.push({ codigo, nombre: nombreStr, apellido: apellidoStr });
+      }
+    }
+  });
+
+  if (alumnosEncontrados.length > 0) {
+    return alumnosEncontrados;
+  }
+
+  // INTENTO 2: Formato por bloques/columnas (Población de códigos y luego nombres)
+  const codigos = [];
+  lineas.forEach(linea => {
+    const match = linea.match(regexCodigo9);
+    if (match) {
+      codigos.push(match[0]);
+    }
+  });
+
+  const palabrasReservadas = [
+    'CICLO', 'MATERIA', 'PROFESOR', 'CENTRO', 'UNIVERSITARIO', 'REGISTRO',
+    'ASISTENCIA', 'ALUMNOS', 'UNIVERSIDAD', 'GUADALAJARA', 'MODULO', 'AULA',
+    'DIAS', 'MES', 'NRC', 'CLAVE', 'SECC', 'ITEL', 'INCO', 'ICIV', 'INBI',
+    'TELE', 'INICIAL', 'FINAL', 'HORA', 'SOLICITUD', 'FECHA', 'FEC', 'HR'
+  ];
+
+  const nombres = [];
+  lineas.forEach(linea => {
+    if (/\d/.test(linea) || /[:\/\.\-]/.test(linea)) return;
+
+    const lineaMayus = linea.toUpperCase();
+    const esReservada = palabrasReservadas.some(word => lineaMayus.includes(word));
+    if (esReservada) return;
+
+    const partes = linea.trim().split(/\s+/);
+    if (partes.length >= 2 && partes.every(p => /^[a-zA-ZÁÉÍÓÚÑáéíóúñ]+$/.test(p))) {
+      nombres.push(linea.trim());
+    }
+  });
+
+  const limite = Math.min(codigos.length, nombres.length);
+  for (let i = 0; i < limite; i++) {
+    const cod = codigos[i];
+    const nombreCompleto = nombres[i];
+    const partes = nombreCompleto.split(/\s+/);
+
+    let apellidoStr = '', nombreStr = '';
+    if (partes.length === 2) {
+      apellidoStr = partes[0];
+      nombreStr = partes[1];
+    } else {
+      apellidoStr = partes.slice(0, 2).join(' ');
+      nombreStr = partes.slice(2).join(' ');
+    }
+
+    alumnosEncontrados.push({
+      codigo: cod,
+      nombre: nombreStr,
+      apellido: apellidoStr
+    });
+  }
+
+  return alumnosEncontrados;
+}
+
+// ------------------------------------------------------------------
 // NAVEGACIÓN Y ARCHIVOS ESTÁTICOS
 // ------------------------------------------------------------------
-
-// Panel de profesor disponible en /profesor
 app.get('/profesor', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'profesor.html'));
 });
 
-// La raíz / sirve public/index.html para alumnos
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ------------------------------------------------------------------
@@ -103,7 +194,7 @@ app.post('/api/alumnos', (req, res) => {
   res.json({ success: true, message: 'Alumno inscrito en el padrón.', alumno: nuevoAlumno });
 });
 
-// BORRAR PADRÓN DE ALUMNOS DE UNA MATERIA
+// BORRAR PADRÓN DE ALUMNOS
 app.delete('/api/alumnos', (req, res) => {
   const { claseId } = req.query;
   if (claseId) {
@@ -115,7 +206,7 @@ app.delete('/api/alumnos', (req, res) => {
   res.json({ success: true, message: 'Padrón de alumnos borrado con éxito.' });
 });
 
-// 1. DESCARGAR PLANTILLA CSV VACÍA (SOLO ENCABEZADOS)
+// 1. DESCARGAR PLANTILLA CSV VACÍA
 app.get('/api/plantilla-alumnos', (req, res) => {
   const contenidoCSV = 'codigo,nombre,apellido\n';
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -159,49 +250,30 @@ app.post('/api/alumnos/importar-texto', (req, res) => {
     return res.status(400).json({ success: false, message: 'Selecciona una clase y proporciona el texto.' });
   }
 
-  const lineas = texto.split('\n');
-  const regexCodigo = /\b\d{9}\b/;
+  const alumnosExtraidos = procesarTextoSIIAU(texto);
   let agregados = 0;
 
-  lineas.forEach(linea => {
-    const match = linea.match(regexCodigo);
-    if (match) {
-      const codigo = match[0];
-
-      let textoLimpio = linea
-        .replace(codigo, '')
-        .replace(/\b(ITEL|INCO|INBI|ICIV|TELE|IG206|K01)\b/g, '')
-        .replace(/^\d+\s*\|\s*/, '')
-        .replace(/[^a-zA-ZÁÉÍÓÚÑáéíóúñ\s]/g, '')
-        .trim();
-
-      if (textoLimpio.length > 3) {
-        const partes = textoLimpio.split(/\s+/);
-        const apellidoStr = partes.slice(0, 2).join(' ');
-        const nombreStr = partes.slice(2).join(' ') || partes[partes.length - 1];
-
-        const existe = padronAlumnos.some(a => a.codigo === codigo && a.claseId === claseId);
-        if (!existe) {
-          padronAlumnos.push({
-            codigo: codigo,
-            nombre: nombreStr,
-            apellido: apellidoStr,
-            claseId: claseId
-          });
-          agregados++;
-        }
-      }
+  alumnosExtraidos.forEach(alumno => {
+    const existe = padronAlumnos.some(a => a.codigo === alumno.codigo && a.claseId === claseId);
+    if (!existe) {
+      padronAlumnos.push({
+        codigo: alumno.codigo,
+        nombre: alumno.nombre,
+        apellido: alumno.apellido,
+        claseId: claseId
+      });
+      agregados++;
     }
   });
 
   guardarJSON(DB_ALUMNOS, padronAlumnos);
   res.json({
     success: true,
-    message: `¡Procesado con éxito! Se registraron ${agregados} alumnos a la clase.`
+    message: `¡Procesado con éxito! Se detectaron ${alumnosExtraidos.length} alumnos y se registraron ${agregados} nuevos a la clase.`
   });
 });
 
-// 4. IMPORTACIÓN DIRECTA DE PDF SIIAU (CUSUR)
+// 4. IMPORTACIÓN DIRECTA DE PDF SIIAU
 app.post('/api/alumnos/importar-pdf', async (req, res) => {
   try {
     if (!req.files || !req.files.pdfFile) {
@@ -214,45 +286,26 @@ app.post('/api/alumnos/importar-pdf', async (req, res) => {
     }
 
     const pdfData = await pdfParse(req.files.pdfFile.data);
-    const lineas = pdfData.text.split('\n');
-    const regexCodigo = /\b\d{9}\b/;
+    const alumnosExtraidos = procesarTextoSIIAU(pdfData.text);
     let agregados = 0;
 
-    lineas.forEach(linea => {
-      const match = linea.match(regexCodigo);
-      if (match) {
-        const codigo = match[0];
-
-        let textoLimpio = linea
-          .replace(codigo, '')
-          .replace(/\b(ITEL|INCO|INBI|ICIV|TELE|IG206|K01)\b/g, '')
-          .replace(/^\d+\s*\|\s*/, '')
-          .replace(/[^a-zA-ZÁÉÍÓÚÑáéíóúñ\s]/g, '')
-          .trim();
-
-        if (textoLimpio.length > 3) {
-          const partes = textoLimpio.split(/\s+/);
-          const apellidoStr = partes.slice(0, 2).join(' ');
-          const nombreStr = partes.slice(2).join(' ') || partes[partes.length - 1];
-
-          const existe = padronAlumnos.some(a => a.codigo === codigo && a.claseId === claseId);
-          if (!existe) {
-            padronAlumnos.push({
-              codigo: codigo,
-              nombre: nombreStr,
-              apellido: apellidoStr,
-              claseId: claseId
-            });
-            agregados++;
-          }
-        }
+    alumnosExtraidos.forEach(alumno => {
+      const existe = padronAlumnos.some(a => a.codigo === alumno.codigo && a.claseId === claseId);
+      if (!existe) {
+        padronAlumnos.push({
+          codigo: alumno.codigo,
+          nombre: alumno.nombre,
+          apellido: alumno.apellido,
+          claseId: claseId
+        });
+        agregados++;
       }
     });
 
     guardarJSON(DB_ALUMNOS, padronAlumnos);
     res.json({
       success: true,
-      message: `¡PDF de SIIAU procesado con éxito! Se registraron ${agregados} alumnos.`
+      message: `¡PDF procesado con éxito! Se detectaron ${alumnosExtraidos.length} alumnos y se registraron ${agregados} nuevos.`
     });
 
   } catch (err) {
@@ -265,7 +318,7 @@ app.post('/api/alumnos/importar-pdf', async (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// RUTAS DE ASISTENCIA (CON DETECCIÓN ANTI-TRAMPAS DE CELULAR)
+// RUTAS DE ASISTENCIA
 // ------------------------------------------------------------------
 app.get('/api/asistencia', (req, res) => {
   const { claseId } = req.query;
@@ -427,9 +480,7 @@ app.delete('/api/asistencia/:folio', (req, res) => {
   res.json({ success: true, message: `Folio ${folioParam} eliminado.` });
 });
 
-// ------------------------------------------------------------------
-// SERVIDOR EN ESCUCHA (SIEMPRE AL FINAL DEL ARCHIVO)
-// ------------------------------------------------------------------
+// SERVIDOR EN ESCUCHA
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n✅ Servidor CUSUR listo en puerto ${PORT}`);
 });
