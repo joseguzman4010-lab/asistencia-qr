@@ -2,8 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const fileUpload = require('express-fileupload');
-const pdfParse = require('pdf-parse');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,7 +13,6 @@ const DB_ALUMNOS = path.join(__dirname, 'alumnos.json');
 // Middlewares
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
-app.use(fileUpload());
 
 // Helpers JSON
 function cargarJSON(filePath, defaultVal = []) {
@@ -46,14 +43,13 @@ let padronAlumnos = cargarJSON(DB_ALUMNOS, [
 ]);
 
 // ------------------------------------------------------------------
-// FUNCIÓN INTELIGENTE DE EXTRACCIÓN SIIAU (EN LÍNEA O POR BLOQUES)
+// FUNCIÓN INTELIGENTE DE EXTRACCIÓN SIIAU
 // ------------------------------------------------------------------
 function procesarTextoSIIAU(texto) {
   const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
   const regexCodigo9 = /\b\d{9}\b/;
   const alumnosEncontrados = [];
 
-  // INTENTO 1: Formato en línea (Código y Nombre en la misma fila)
   lineas.forEach(linea => {
     const match = linea.match(regexCodigo9);
     if (match) {
@@ -80,17 +76,12 @@ function procesarTextoSIIAU(texto) {
     }
   });
 
-  if (alumnosEncontrados.length > 0) {
-    return alumnosEncontrados;
-  }
+  if (alumnosEncontrados.length > 0) return alumnosEncontrados;
 
-  // INTENTO 2: Formato por bloques/columnas (Población de códigos y luego nombres)
   const codigos = [];
   lineas.forEach(linea => {
     const match = linea.match(regexCodigo9);
-    if (match) {
-      codigos.push(match[0]);
-    }
+    if (match) codigos.push(match[0]);
   });
 
   const palabrasReservadas = [
@@ -103,10 +94,8 @@ function procesarTextoSIIAU(texto) {
   const nombres = [];
   lineas.forEach(linea => {
     if (/\d/.test(linea) || /[:\/\.\-]/.test(linea)) return;
-
     const lineaMayus = linea.toUpperCase();
-    const esReservada = palabrasReservadas.some(word => lineaMayus.includes(word));
-    if (esReservada) return;
+    if (palabrasReservadas.some(word => lineaMayus.includes(word))) return;
 
     const partes = linea.trim().split(/\s+/);
     if (partes.length >= 2 && partes.every(p => /^[a-zA-ZÁÉÍÓÚÑáéíóúñ]+$/.test(p))) {
@@ -116,10 +105,7 @@ function procesarTextoSIIAU(texto) {
 
   const limite = Math.min(codigos.length, nombres.length);
   for (let i = 0; i < limite; i++) {
-    const cod = codigos[i];
-    const nombreCompleto = nombres[i];
-    const partes = nombreCompleto.split(/\s+/);
-
+    const partes = nombres[i].split(/\s+/);
     let apellidoStr = '', nombreStr = '';
     if (partes.length === 2) {
       apellidoStr = partes[0];
@@ -130,7 +116,7 @@ function procesarTextoSIIAU(texto) {
     }
 
     alumnosEncontrados.push({
-      codigo: cod,
+      codigo: codigos[i],
       nombre: nombreStr,
       apellido: apellidoStr
     });
@@ -170,9 +156,7 @@ app.post('/api/clases', (req, res) => {
 // ------------------------------------------------------------------
 app.get('/api/alumnos', (req, res) => {
   const { claseId } = req.query;
-  if (claseId) {
-    return res.json(padronAlumnos.filter(a => a.claseId === claseId));
-  }
+  if (claseId) return res.json(padronAlumnos.filter(a => a.claseId === claseId));
   res.json(padronAlumnos);
 });
 
@@ -194,7 +178,6 @@ app.post('/api/alumnos', (req, res) => {
   res.json({ success: true, message: 'Alumno inscrito en el padrón.', alumno: nuevoAlumno });
 });
 
-// BORRAR PADRÓN DE ALUMNOS
 app.delete('/api/alumnos', (req, res) => {
   const { claseId } = req.query;
   if (claseId) {
@@ -206,7 +189,6 @@ app.delete('/api/alumnos', (req, res) => {
   res.json({ success: true, message: 'Padrón de alumnos borrado con éxito.' });
 });
 
-// 1. DESCARGAR PLANTILLA CSV VACÍA
 app.get('/api/plantilla-alumnos', (req, res) => {
   const contenidoCSV = 'codigo,nombre,apellido\n';
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -214,10 +196,8 @@ app.get('/api/plantilla-alumnos', (req, res) => {
   res.status(200).send('\uFEFF' + contenidoCSV);
 });
 
-// 2. IMPORTACIÓN MASIVA DESDE CSV
 app.post('/api/alumnos/importar', (req, res) => {
   const { claseId, alumnos } = req.body;
-
   if (!claseId || !Array.isArray(alumnos)) {
     return res.status(400).json({ success: false, message: 'Datos de importación inválidos.' });
   }
@@ -243,7 +223,6 @@ app.post('/api/alumnos/importar', (req, res) => {
   res.json({ success: true, message: `¡Éxito! Se inscribieron ${agregados} alumnos a la materia.` });
 });
 
-// 3. IMPORTACIÓN DIRECTA PEGAR TEXTO (SIIAU / PDF)
 app.post('/api/alumnos/importar-texto', (req, res) => {
   const { claseId, texto } = req.body;
   if (!claseId || !texto) {
@@ -273,52 +252,8 @@ app.post('/api/alumnos/importar-texto', (req, res) => {
   });
 });
 
-// 4. IMPORTACIÓN DIRECTA DE PDF SIIAU
-app.post('/api/alumnos/importar-pdf', async (req, res) => {
-  try {
-    if (!req.files || !req.files.pdfFile) {
-      return res.status(400).json({ success: false, message: 'No se recibió ningún archivo PDF.' });
-    }
-
-    const { claseId } = req.body;
-    if (!claseId) {
-      return res.status(400).json({ success: false, message: 'ID de clase requerido.' });
-    }
-
-    const pdfData = await pdfParse(req.files.pdfFile.data);
-    const alumnosExtraidos = procesarTextoSIIAU(pdfData.text);
-    let agregados = 0;
-
-    alumnosExtraidos.forEach(alumno => {
-      const existe = padronAlumnos.some(a => a.codigo === alumno.codigo && a.claseId === claseId);
-      if (!existe) {
-        padronAlumnos.push({
-          codigo: alumno.codigo,
-          nombre: alumno.nombre,
-          apellido: alumno.apellido,
-          claseId: claseId
-        });
-        agregados++;
-      }
-    });
-
-    guardarJSON(DB_ALUMNOS, padronAlumnos);
-    res.json({
-      success: true,
-      message: `¡PDF procesado con éxito! Se detectaron ${alumnosExtraidos.length} alumnos y se registraron ${agregados} nuevos.`
-    });
-
-  } catch (err) {
-    console.error("Error al procesar el PDF:", err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error interno al procesar el PDF. Usa la opción "Pegar Lista SIIAU" o sube un archivo CSV.' 
-    });
-  }
-});
-
 // ------------------------------------------------------------------
-// RUTAS DE ASISTENCIA
+// RUTAS DE ASISTENCIA Y EXPORTACIÓN A EXCEL
 // ------------------------------------------------------------------
 app.get('/api/asistencia', (req, res) => {
   const { claseId } = req.query;
@@ -326,6 +261,30 @@ app.get('/api/asistencia', (req, res) => {
     return res.json(asistenciasProcesadas.filter(a => a.claseId === claseId));
   }
   res.json(asistenciasProcesadas);
+});
+
+// EXPORTAR TABLA DE ASISTENCIAS A EXCEL (CSV)
+app.get('/api/asistencia/exportar', (req, res) => {
+  const { claseId } = req.query;
+  if (!claseId) return res.status(400).send('ID de materia requerido.');
+
+  const registros = asistenciasProcesadas.filter(a => a.claseId === claseId);
+  const claseInfo = clasesRegistradas.find(c => c.id === claseId);
+
+  let csv = 'Folio,Codigo,Nombre,Apellido,Fecha_Hora,Estado_Dispositivo,Estado\n';
+  registros.forEach(r => {
+    const nom = (r.nombre || '').replace(/,/g, '');
+    const ape = (r.apellido || '').replace(/,/g, '');
+    const dev = (r.estadoDispositivo || '').replace(/,/g, '');
+    csv += `"${r.folio}","${r.codigo}","${nom}","${ape}","${r.fechaHora}","${dev}","${r.estado}"\n`;
+  });
+
+  const nombreClaseLimpio = claseInfo ? claseInfo.nombre.replace(/[^a-zA-Z0-9]/g, '_') : 'Materia';
+  const filename = `Reporte_Asistencias_${nombreClaseLimpio}.csv`;
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+  res.status(200).send('\uFEFF' + csv);
 });
 
 app.post('/api/asistencia', (req, res) => {
@@ -406,7 +365,6 @@ app.post('/api/asistencia', (req, res) => {
   });
 });
 
-// CIERRE DE LISTA AUTOMÁTICO
 app.post('/api/asistencia/cerrar-lista', (req, res) => {
   const { claseId } = req.body;
   if (!claseId) return res.status(400).json({ success: false, message: 'ID de materia requerido.' });
@@ -454,7 +412,6 @@ app.post('/api/asistencia/cerrar-lista', (req, res) => {
   });
 });
 
-// EDITAR REGISTRO
 app.put('/api/asistencia/:folio', (req, res) => {
   const folioParam = req.params.folio;
   const { estado } = req.body;
@@ -468,7 +425,6 @@ app.put('/api/asistencia/:folio', (req, res) => {
   res.json({ success: true, message: `Folio ${folioParam} actualizado a ${estado}.` });
 });
 
-// ELIMINAR REGISTRO
 app.delete('/api/asistencia/:folio', (req, res) => {
   const folioParam = String(req.params.folio);
 

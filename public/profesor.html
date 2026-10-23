@@ -71,7 +71,6 @@
     .action-btn { padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; margin-right: 4px; }
     .btn-delete { background: #ffe4e6; color: #be123c; }
 
-    /* MODAL DE PEGAR LISTA */
     .modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(15, 23, 42, 0.7); display: none; justify-content: center; align-items: center; z-index: 10000;
@@ -132,17 +131,16 @@
       <button class="btn btn-orange" onclick="window.inscribirAlumno()">👤 Inscribir Manual</button>
       
       <button class="btn btn-indigo" onclick="window.abrirModalTexto()">📋 Pegar Lista SIIAU</button>
-      <button class="btn btn-indigo" onclick="document.getElementById('inputPdf').click()">📄 Subir Lista SIIAU (PDF)</button>
       <button class="btn btn-teal" onclick="window.descargarPlantillaCSV()">📥 Plantilla CSV</button>
       <button class="btn btn-blue" onclick="document.getElementById('inputCsv').click()">📤 Subir CSV</button>
       <button class="btn btn-red" onclick="window.vaciarPadron()">🗑️ Vaciar Padrón</button>
 
-      <input type="file" id="inputPdf" accept=".pdf" style="display: none;" onchange="window.subirListaPDF(event)">
       <input type="file" id="inputCsv" accept=".csv" style="display: none;" onchange="window.subirCSV(event)">
     </div>
 
     <div class="toolbar">
       <button class="btn btn-green" onclick="window.iniciarProyector()">▶ Iniciar Proyector QR (Ventana Emergente)</button>
+      <button class="btn btn-teal" onclick="window.exportarExcel()">📊 Exportar a Excel</button>
       <button class="btn btn-red" onclick="window.cerrarListaFaltas()">🔒 Cerrar Lista y Generar Faltas</button>
       <button class="btn btn-blue" onclick="window.cargarAsistencias()">🔄 Actualizar Lista</button>
     </div>
@@ -265,6 +263,15 @@
       );
     };
 
+    window.exportarExcel = function() {
+      const select = document.getElementById("selectClase");
+      if (!select || !select.value) {
+        alert("Selecciona una materia activa para exportar.");
+        return;
+      }
+      window.open(`/api/asistencia/exportar?claseId=${select.value}`, '_blank');
+    };
+
     window.crearNuevaClase = async function() {
       const nombre = prompt("Nombre de la nueva materia:");
       if (!nombre) return;
@@ -295,7 +302,6 @@
       alert(data.message || "Alumno inscrito con éxito.");
     };
 
-    /* MODAL DE PEGAR LISTA SIIAU */
     window.abrirModalTexto = function() {
       const select = document.getElementById("selectClase");
       if (!select || !select.value) {
@@ -353,26 +359,6 @@
       } catch (err) {
         alert("Error al vaciar el padrón.");
       }
-    };
-
-    window.subirListaPDF = async function(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const select = document.getElementById("selectClase");
-      const formData = new FormData();
-      formData.append('pdfFile', file);
-      formData.append('claseId', select.value);
-
-      try {
-        const res = await fetch('/api/alumnos/importar-pdf', { method: 'POST', body: formData });
-        const data = await res.json();
-        alert(data.message);
-        window.cargarAsistencias();
-      } catch (err) {
-        alert("Error al procesar el PDF.");
-      }
-      e.target.value = '';
     };
 
     window.descargarPlantillaCSV = function() {
