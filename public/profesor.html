@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Profesor - Control de Asistencias CUSUR</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
     body { background-color: #f8fafc; color: #0f172a; padding: 20px; }
@@ -28,74 +27,100 @@
       border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px;
     }
 
-    #panelContenido { display: none; }
-    .header { text-align: center; margin-bottom: 20px; position: relative; }
-    .header h1 { color: #1e40af; font-size: 26px; font-weight: 800; }
+    #panelContenido { display: none; max-width: 1200px; margin: 0 auto; }
+    
+    .header { text-align: center; margin-bottom: 25px; position: relative; }
+    .header h1 { color: #1e40af; font-size: 28px; font-weight: 800; }
     .header h2 { font-size: 16px; color: #475569; margin-top: 4px; }
-    .btn-logout { position: absolute; right: 0; top: 0; background: #e2e8f0; color: #334155; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 12px; }
+    .btn-logout { position: absolute; right: 0; top: 0; background: #e2e8f0; color: #334155; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 12px; }
 
+    /* Barra de Selección de Asignatura */
     .class-bar {
-      max-width: 1300px; margin: 0 auto 15px auto; background: white; padding: 12px 20px;
-      border-radius: 10px; display: flex; align-items: center; gap: 10px; border: 1px solid #e2e8f0; flex-wrap: wrap;
+      background: white; padding: 16px 20px; border-radius: 12px;
+      display: flex; align-items: center; gap: 12px; border: 1px solid #e2e8f0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 20px;
     }
-    .class-bar label { font-weight: 700; font-size: 14px; color: #1e293b; }
-    .class-select { padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; flex: 1; min-width: 200px; }
+    .class-bar label { font-weight: 700; font-size: 15px; color: #1e293b; }
+    .class-select { padding: 10px 14px; border-radius: 8px; border: 2px solid #cbd5e1; font-weight: 700; font-size: 15px; flex: 1; color: #1e40af; background: #f8fafc; }
 
-    .toolbar { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-    .btn { padding: 9px 16px; border: none; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; color: white; transition: opacity 0.2s; }
-    .btn:hover { opacity: 0.9; }
-    .btn-green { background-color: #16a34a; }
-    .btn-blue { background-color: #2563eb; }
-    .btn-teal { background-color: #0d9488; }
-    .btn-orange { background-color: #ea580c; }
-    .btn-purple { background-color: #7c3aed; }
-    .btn-red { background-color: #dc2626; }
+    /* BOTONES PRINCIPALES DEL DÍA A DÍA */
+    .main-actions {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px; margin-bottom: 25px;
+    }
+    .btn-hero {
+      padding: 18px 20px; border: none; border-radius: 12px; font-weight: 800; font-size: 15px;
+      cursor: pointer; color: white; display: flex; align-items: center; justify-content: center;
+      gap: 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: transform 0.1s, opacity 0.2s;
+    }
+    .btn-hero:hover { opacity: 0.95; transform: translateY(-1px); }
+    .btn-hero:active { transform: translateY(0); }
+    
+    .btn-proyectar { background-color: #16a34a; } /* Verde principal */
+    .btn-cerrar { background-color: #dc2626; }    /* Rojo principal */
+    .btn-excel { background-color: #0d9488; }     /* Teal principal */
+
+    /* SECCIÓN DESPLEGABLE (OPCIONES AVANZADAS) */
+    details.config-section {
+      background: #f1f5f9; border: 1px dashed #cbd5e1; border-radius: 10px;
+      padding: 12px 18px; margin-bottom: 25px;
+    }
+    details summary {
+      font-weight: 700; font-size: 13px; color: #475569; cursor: pointer; user-select: none;
+    }
+    .config-buttons {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; padding-top: 10px; border-top: 1px solid #e2e8f0;
+    }
+    .btn-sub {
+      padding: 8px 14px; border: none; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; color: white;
+    }
     .btn-indigo { background-color: #4f46e5; }
+    .btn-purple { background-color: #7c3aed; }
+    .btn-orange { background-color: #ea580c; }
+    .btn-red-sub { background-color: #991b1b; }
 
-    .main-grid { display: grid; grid-template-columns: 320px 1fr; gap: 20px; max-width: 1300px; margin: 0 auto; }
-    @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
-
+    /* TABLA */
     .card { background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
-    .qr-container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; background: #f1f5f9; border-radius: 10px; margin-top: 15px; min-height: 180px; text-align: center; }
-    .ip-input { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 10px; font-size: 13px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .card-header h3 { font-size: 18px; color: #1e293b; }
 
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
-    th { background-color: #f1f5f9; color: #334155; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+    th { background-color: #f8fafc; color: #475569; font-weight: 700; }
 
-    .badge-dev-valido { background-color: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; display: inline-block; }
-    .badge-dev-sospechoso { background-color: #fecdd3; color: #991b1b; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; display: inline-block; max-width: 180px; line-height: 1.2; }
-    .badge-presente { background: #dcfce7; color: #15803d; padding: 3px 8px; border-radius: 12px; font-weight: 700; font-size: 11px; }
-    .badge-falta { background: #fee2e2; color: #b91c1c; padding: 3px 8px; border-radius: 12px; font-weight: 700; font-size: 11px; }
+    .badge-presente { background: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 11px; }
+    .badge-falta { background: #fee2e2; color: #b91c1c; padding: 4px 10px; border-radius: 12px; font-weight: 700; font-size: 11px; }
+    .badge-dev-valido { background-color: #e0e7ff; color: #3730a3; padding: 3px 8px; border-radius: 6px; font-weight: 600; font-size: 11px; }
+    .badge-dev-sospechoso { background-color: #fecdd3; color: #991b1b; padding: 3px 8px; border-radius: 6px; font-weight: 600; font-size: 11px; }
 
-    .action-btn { padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; margin-right: 4px; }
+    .action-btn { padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; }
     .btn-delete { background: #ffe4e6; color: #be123c; }
 
+    /* MODAL SIIAU */
     .modal-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(15, 23, 42, 0.7); display: none; justify-content: center; align-items: center; z-index: 10000;
     }
     .modal-box {
-      background: white; border-radius: 12px; padding: 25px; width: 90%; max-width: 650px;
+      background: white; border-radius: 12px; padding: 25px; width: 90%; max-width: 600px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     }
     .modal-box h3 { font-size: 18px; color: #1e40af; margin-bottom: 8px; }
-    .modal-box p { font-size: 13px; color: #64748b; margin-bottom: 12px; }
     .modal-box textarea {
-      width: 100%; height: 220px; border: 1px solid #cbd5e1; border-radius: 8px;
-      padding: 10px; font-size: 12px; font-family: monospace; resize: vertical; margin-bottom: 15px;
+      width: 100%; height: 200px; border: 1px solid #cbd5e1; border-radius: 8px;
+      padding: 10px; font-size: 12px; font-family: monospace; resize: vertical; margin: 10px 0 15px 0;
     }
     .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
   </style>
 </head>
 <body>
 
-  <!-- PANTALLA DE LOGIN -->
+  <!-- LOGIN OVERLAY -->
   <div id="loginOverlay">
     <div class="login-card">
       🔒
       <h2>Acceso Docente</h2>
-      <p>Ingresa la clave de acceso para ver el panel administrativo de CUSUR.</p>
+      <p>Ingresa la clave de acceso para ver el panel de asistencias.</p>
       <input type="password" id="passwordInput" placeholder="Contraseña de acceso" onkeypress="if(event.key==='Enter') window.validarPassword()">
       <button id="btnIngresar" onclick="window.validarPassword()">Ingresar al Panel</button>
       <p id="errorMsg" style="color: #dc2626; font-size: 12px; margin-top: 10px; display: none;">⚠️ Contraseña incorrecta</p>
@@ -106,11 +131,11 @@
   <div id="modalTexto" class="modal-overlay">
     <div class="modal-box">
       <h3>📋 Importar Lista desde SIIAU</h3>
-      <p>Copia todo el texto de tu lista de SIIAU (o PDF) y pégalo tal cual en el cuadro de abajo:</p>
-      <textarea id="textoSiiauInput" placeholder="Pega aquí el texto completo copiado de SIIAU..."></textarea>
+      <p style="font-size: 12px; color: #64748b;">Copia todo el texto de tu lista de SIIAU y pégalo tal cual abajo:</p>
+      <textarea id="textoSiiauInput" placeholder="Pega aquí el texto copiado de SIIAU..."></textarea>
       <div class="modal-actions">
-        <button class="btn" style="background:#64748b" onclick="window.cerrarModalTexto()">Cancelar</button>
-        <button class="btn btn-indigo" onclick="window.procesarModalTexto()">Procesar e Importar</button>
+        <button class="btn-sub" style="background:#64748b" onclick="window.cerrarModalTexto()">Cancelar</button>
+        <button class="btn-sub btn-indigo" onclick="window.procesarModalTexto()">Procesar e Importar</button>
       </div>
     </div>
   </div>
@@ -120,72 +145,66 @@
     <div class="header">
       <button class="btn-logout" onclick="window.cerrarSesion()">🔒 Salir</button>
       <h1>Control de Asistencias - CUSUR</h1>
-      <h2 id="materiaTituloDisplay">Materia: Cargar Asignatura...</h2>
+      <h2 id="materiaTituloDisplay">Cargando asignatura...</h2>
     </div>
 
+    <!-- SELECTOR DE MATERIA -->
     <div class="class-bar">
       <label for="selectClase">📚 Asignatura Activa:</label>
       <select id="selectClase" class="class-select" onchange="window.cambiarMateria()"></select>
-      
-      <button class="btn btn-purple" onclick="window.crearNuevaClase()">➕ Nueva Materia</button>
-      <button class="btn btn-orange" onclick="window.inscribirAlumno()">👤 Inscribir Manual</button>
-      
-      <button class="btn btn-indigo" onclick="window.abrirModalTexto()">📋 Pegar Lista SIIAU</button>
-      <button class="btn btn-teal" onclick="window.descargarPlantillaCSV()">📥 Plantilla CSV</button>
-      <button class="btn btn-blue" onclick="document.getElementById('inputCsv').click()">📤 Subir CSV</button>
-      <button class="btn btn-red" onclick="window.vaciarPadron()">🗑️ Vaciar Padrón</button>
-
-      <input type="file" id="inputCsv" accept=".csv" style="display: none;" onchange="window.subirCSV(event)">
     </div>
 
-    <div class="toolbar">
-      <button class="btn btn-green" onclick="window.iniciarProyector()">▶ Iniciar Proyector QR (Ventana Emergente)</button>
-      <button class="btn btn-teal" onclick="window.exportarExcel()">📊 Exportar a Excel</button>
-      <button class="btn btn-red" onclick="window.cerrarListaFaltas()">🔒 Cerrar Lista y Generar Faltas</button>
-      <button class="btn btn-red" style="background-color: #b91c1c;" onclick="window.vaciarAsistencias()">🗑️ Vaciar Tabla Asistencias</button>
-      <button class="btn btn-blue" onclick="window.cargarAsistencias()">🔄 Actualizar Lista</button>
+    <!-- BOTONES PRINCIPALES (DÍA A DÍA) -->
+    <div class="main-actions">
+      <button class="btn-hero btn-proyectar" onclick="window.iniciarProyector()">
+        <span style="font-size: 20px;">▶</span> PROYECTAR QR
+      </button>
+      
+      <button class="btn-hero btn-cerrar" onclick="window.cerrarListaFaltas()">
+        <span style="font-size: 20px;">🔒</span> CERRAR LISTA
+      </button>
+      
+      <button class="btn-hero btn-excel" onclick="window.exportarExcel()">
+        <span style="font-size: 20px;">📊</span> EXPORTAR REPORTE EXCEL
+      </button>
     </div>
 
-    <div class="main-grid">
-      <div class="card">
-        <h3>Proyector QR Independiente</h3>
-        <p style="font-size: 12px; color: #64748b; margin-top: 4px;">Modo transmisión segura para el salón de clase.</p>
-
-        <div style="margin-top: 15px;">
-          <label style="font-size: 12px; font-weight: 700;">URL / Dirección del Servidor:</label>
-          <input type="text" id="ipInput" class="ip-input" value="https://asistencia-cusur.onrender.com">
-        </div>
-
-        <div class="qr-container">
-          <p style="font-size: 13px; color: #475569; font-weight: 600; margin-bottom: 10px;">
-            🖥️ El código QR se abrirá en una ventana separada.
-          </p>
-          <button class="btn btn-green" onclick="window.iniciarProyector()">▶ Abrir Proyector QR</button>
-        </div>
+    <!-- MENU DESPLEGABLE CON CONFIGURACIONES Y HERRAMIENTAS DE CARGA -->
+    <details class="config-section">
+      <summary>⚙️ Cargar Alumnos / Administrar Materias (Opciones Avanzadas)</summary>
+      <div class="config-buttons">
+        <button class="btn-sub btn-indigo" onclick="window.abrirModalTexto()">📋 Pegar Lista SIIAU</button>
+        <button class="btn-sub btn-purple" onclick="window.crearNuevaClase()">➕ Nueva Materia</button>
+        <button class="btn-sub btn-orange" onclick="window.inscribirAlumno()">👤 Inscribir Alumno Manual</button>
+        <button class="btn-sub btn-red-sub" onclick="window.vaciarPadron()">🗑️ Vaciar Padrón de Alumnos</button>
+        <button class="btn-sub btn-red-sub" onclick="window.vaciarAsistencias()">🗑️ Vaciar Asistencias de la Clase</button>
       </div>
+    </details>
 
-      <div class="card">
-        <h3>Alumnos Registrados / Asistencias (<span id="totalCount">0</span>)</h3>
-        
-        <div style="overflow-x: auto; margin-top: 15px;">
-          <table>
-            <thead>
-              <tr>
-                <th>Folio</th>
-                <th>Nombre</th>
-                <th>Apellido</th>
-                <th>Código</th>
-                <th>Fecha y Hora (CDMX)</th>
-                <th>Estado Dispositivo</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="tablaCuerpo">
-              <tr><td colspan="8" style="text-align: center; color: #94a3b8;">Cargando...</td></tr>
-            </tbody>
-          </table>
-        </div>
+    <!-- TABLA EN TIEMPO REAL -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Lista de Alumnos / Pase de Lista de Hoy (<span id="totalCount">0</span>)</h3>
+      </div>
+      
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Folio</th>
+              <th>Nombre</th>
+              <th>Apellido</th>
+              <th>Código</th>
+              <th>Hora de Entrada</th>
+              <th>Dispositivo</th>
+              <th>Estado</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody id="tablaCuerpo">
+            <tr><td colspan="8" style="text-align: center; color: #94a3b8;">Cargando...</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -193,7 +212,6 @@
   <script>
     const CLAVE_CORRECTA = "cusur2026";
     let clases = [];
-
     const headersApi = { 'Content-Type': 'application/json' };
 
     window.validarPassword = function() {
@@ -266,10 +284,58 @@
     window.exportarExcel = function() {
       const select = document.getElementById("selectClase");
       if (!select || !select.value) {
-        alert("Selecciona una materia activa para exportar.");
+        alert("Selecciona una materia activa.");
         return;
       }
       window.open(`/api/asistencia/exportar?claseId=${select.value}`, '_blank');
+    };
+
+    window.cerrarListaFaltas = async function() {
+      const select = document.getElementById("selectClase");
+      if (!confirm("¿Deseas cerrar la lista de hoy y registrar FALTA a los alumnos pendientes?")) return;
+      
+      const res = await fetch('/api/asistencia/cerrar-lista', {
+        method: 'POST',
+        headers: headersApi,
+        body: JSON.stringify({ claseId: select.value })
+      });
+      const data = await res.json();
+      alert(data.message || "Lista cerrada.");
+      window.cargarAsistencias();
+    };
+
+    window.abrirModalTexto = function() {
+      document.getElementById("textoSiiauInput").value = "";
+      document.getElementById("modalTexto").style.display = "flex";
+    };
+
+    window.cerrarModalTexto = function() {
+      document.getElementById("modalTexto").style.display = "none";
+    };
+
+    window.procesarModalTexto = async function() {
+      const select = document.getElementById("selectClase");
+      const texto = document.getElementById("textoSiiauInput").value.trim();
+
+      if (!texto) {
+        alert("Pega el texto antes de procesar.");
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/alumnos/importar-texto', {
+          method: 'POST',
+          headers: headersApi,
+          body: JSON.stringify({ claseId: select.value, texto })
+        });
+
+        const data = await res.json();
+        alert(data.message);
+        window.cerrarModalTexto();
+        window.cargarAsistencias();
+      } catch (err) {
+        alert("Error al procesar el texto.");
+      }
     };
 
     window.crearNuevaClase = async function() {
@@ -299,141 +365,34 @@
         body: JSON.stringify({ codigo, nombre, apellido, claseId: select.value })
       });
       const data = await res.json();
-      alert(data.message || "Alumno inscrito con éxito.");
+      alert(data.message || "Alumno inscrito.");
       window.cargarAsistencias();
-    };
-
-    window.abrirModalTexto = function() {
-      const select = document.getElementById("selectClase");
-      if (!select || !select.value) {
-        alert("Por favor selecciona una materia activa.");
-        return;
-      }
-      document.getElementById("textoSiiauInput").value = "";
-      document.getElementById("modalTexto").style.display = "flex";
-    };
-
-    window.cerrarModalTexto = function() {
-      document.getElementById("modalTexto").style.display = "none";
-    };
-
-    window.procesarModalTexto = async function() {
-      const select = document.getElementById("selectClase");
-      const texto = document.getElementById("textoSiiauInput").value.trim();
-
-      if (!texto) {
-        alert("Pega la lista antes de procesar.");
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/alumnos/importar-texto', {
-          method: 'POST',
-          headers: headersApi,
-          body: JSON.stringify({ claseId: select.value, texto })
-        });
-
-        const data = await res.json();
-        alert(data.message);
-        window.cerrarModalTexto();
-        window.cargarAsistencias();
-      } catch (err) {
-        alert("Error al procesar el texto.");
-        console.error(err);
-      }
     };
 
     window.vaciarPadron = async function() {
       const select = document.getElementById("selectClase");
-      if (!select || !select.value) {
-        alert("Selecciona una materia activa.");
-        return;
-      }
-
-      if (!confirm("⚠️ ¿Seguro que deseas eliminar TODOS los alumnos inscritos en esta materia del padrón?")) return;
+      if (!confirm("⚠️ ¿Seguro que deseas eliminar TODOS los alumnos de esta materia?")) return;
 
       try {
         const res = await fetch(`/api/alumnos?claseId=${select.value}`, { method: 'DELETE', headers: headersApi });
         const data = await res.json();
         alert(data.message);
         window.cargarAsistencias();
-      } catch (err) {
-        alert("Error al vaciar el padrón.");
-      }
+      } catch (err) { alert("Error al vaciar padrón."); }
     };
 
     window.vaciarAsistencias = async function() {
       const select = document.getElementById("selectClase");
-      if (!select || !select.value) {
-        alert("Selecciona una materia activa.");
-        return;
-      }
-
-      if (!confirm("⚠️ ¿Seguro que deseas eliminar TODOS los registros de asistencia/faltas de la tabla?")) return;
+      if (!confirm("⚠️ ¿Seguro que deseas eliminar el historial de asistencias de esta materia?")) return;
 
       try {
         const res = await fetch(`/api/asistencia/vaciar?claseId=${select.value}`, { method: 'DELETE', headers: headersApi });
         const data = await res.json();
         alert(data.message);
         window.cargarAsistencias();
-      } catch (err) {
-        alert("Error al vaciar la tabla de asistencias.");
-      }
+      } catch (err) { alert("Error al vaciar asistencias."); }
     };
 
-    window.descargarPlantillaCSV = function() {
-      window.open('/api/plantilla-alumnos', '_blank');
-    };
-
-    window.subirCSV = function(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const select = document.getElementById("selectClase");
-      const reader = new FileReader();
-
-      reader.onload = async function(evt) {
-        const lineas = evt.target.result.split(/\r\n|\n/);
-        const alumnos = [];
-
-        for (let i = 1; i < lineas.length; i++) {
-          const linea = lineas[i].trim();
-          if (!linea) continue;
-          const cols = linea.split(',');
-          if (cols.length >= 2) {
-            alumnos.push({
-              codigo: cols[0].trim(),
-              nombre: cols[1].trim(),
-              apellido: cols[2] ? cols[2].trim() : ''
-            });
-          }
-        }
-
-        if (alumnos.length === 0) {
-          alert("El archivo CSV no contiene registros válidos.");
-          return;
-        }
-
-        try {
-          const res = await fetch('/api/alumnos/importar', {
-            method: 'POST',
-            headers: headersApi,
-            body: JSON.stringify({ claseId: select.value, alumnos })
-          });
-          const data = await res.json();
-          alert(data.message);
-          window.cargarAsistencias();
-        } catch (err) {
-          alert("Error al importar CSV.");
-        }
-      };
-      reader.readAsText(file, 'UTF-8');
-      e.target.value = '';
-    };
-
-    // ------------------------------------------------------------------
-    // CARGAR ALUMNOS Y MOSTRAR "FALTA" POR DEFECTO HASTA QUE ESCANEEN
-    // ------------------------------------------------------------------
     window.cargarAsistencias = async function() {
       const select = document.getElementById("selectClase");
       if (!select || !select.value) return;
@@ -447,7 +406,6 @@
         const alumnos = await resAlumnos.json();
         const asistencias = await resAsistencias.json();
 
-        // Mapear asistencias escaneadas por código de alumno
         const asistenciaMap = new Map();
         asistencias.forEach(a => asistenciaMap.set(a.codigo, a));
 
@@ -455,7 +413,7 @@
         const tbody = document.getElementById("tablaCuerpo");
 
         if (alumnos.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #94a3b8;">No hay alumnos en el padrón. Usa "📋 Pegar Lista SIIAU" para importar la clase.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #94a3b8; padding: 20px;">No hay alumnos cargados. Abre '⚙️ Cargar Alumnos' arriba para pegar tu lista.</td></tr>`;
           return;
         }
 
@@ -463,7 +421,6 @@
           const reg = asistenciaMap.get(alumno.codigo);
 
           if (reg) {
-            // El alumno ya escaneó o tiene registro manual
             const devBadge = reg.estadoDispositivo && reg.estadoDispositivo.includes('Sospechoso') 
               ? `<span class="badge-dev-sospechoso">${reg.estadoDispositivo}</span>` 
               : `<span class="badge-dev-valido">${reg.estadoDispositivo || 'Válido'}</span>`;
@@ -487,15 +444,14 @@
               </tr>
             `;
           } else {
-            // El alumno aún no ha escaneado: se muestra pendiente con FALTA por defecto
             return `
               <tr style="background-color: #fff1f2;">
-                <td><strong style="color: #94a3b8;">-</strong></td>
+                <td><strong style="color: #cbd5e1;">-</strong></td>
                 <td>${alumno.nombre}</td>
                 <td>${alumno.apellido || '-'}</td>
                 <td>${alumno.codigo}</td>
                 <td><span style="color: #94a3b8; font-size: 11px;">Esperando escaneo...</span></td>
-                <td><span style="color: #94a3b8; font-size: 11px;">Sin Registro</span></td>
+                <td><span style="color: #94a3b8; font-size: 11px;">Sin registro</span></td>
                 <td><span class="badge-falta">FALTA</span></td>
                 <td>-</td>
               </tr>
@@ -510,20 +466,6 @@
     window.eliminarAsistencia = async function(folio) {
       if (!confirm(`¿Eliminar la asistencia con folio ${folio}?`)) return;
       await fetch(`/api/asistencia/${folio}`, { method: 'DELETE', headers: headersApi });
-      window.cargarAsistencias();
-    };
-
-    window.cerrarListaFaltas = async function() {
-      const select = document.getElementById("selectClase");
-      if (!confirm("¿Cerrar lista y registrar faltas a los alumnos no reportados?")) return;
-      
-      const res = await fetch('/api/asistencia/cerrar-lista', {
-        method: 'POST',
-        headers: headersApi,
-        body: JSON.stringify({ claseId: select.value })
-      });
-      const data = await res.json();
-      alert(data.message || "Lista cerrada.");
       window.cargarAsistencias();
     };
 
